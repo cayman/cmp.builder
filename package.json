@@ -1,0 +1,31 @@
+{
+    "name": "grunt-cmp-builder",
+    "description": "Grunt compiler for cmp components",
+    "version": "0.0.1",
+    "author": {
+        "name": "Zakirov"
+    },
+    "main": "Gruntfile.js",
+    "engines": {
+        "node": ">= 0.8.0"
+    },
+    "scripts": {
+        "test": "grunt test"
+    },
+    "dependencies": {
+        "js-yaml": "~3.0.2",
+        "node.extend": "~1.0.9",
+        "dirsum": "~0.1.1",
+        "shorthash": "~0.0.2",
+        "bower": "~1.2.8",
+        "semver": "~2.2.1",
+        "inquirer": "~0.4.1"
+    },
+    "devDependencies": {
+        "grunt": "~0.4.1"
+    },
+    "keywords": [
+        "gruntplugin"
+    ],
+    "readmeFilename": "README.md"
+}
