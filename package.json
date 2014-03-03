@@ -6,6 +6,11 @@
         "name": "Zakirov"
     },
     "main": "Gruntfile.js",
+    "homepage" : "https://github.com/cayman/cmp.builder",
+    "repository" : {
+        "type" : "git",
+        "url" : "https://github.com/cayman/cmp.builder.git"
+    },
     "engines": {
         "node": ">= 0.8.0"
     },
@@ -27,5 +32,6 @@
     "keywords": [
         "gruntplugin"
     ],
+    "license": " MIT",
     "readmeFilename": "README.md"
 }
