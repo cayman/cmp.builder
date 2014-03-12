@@ -54,7 +54,6 @@ exports.init = function (grunt) {
 
             } else {
 
-
                 cmp.id = cmp.type + '_' + cmp.name + '_' + cmp.version.replace(/\./g,'$');
                 done(cmp);
             }

@@ -35,5 +35,11 @@ exports.init = function (grunt) {
         }
     };
 
+    lib.getDependenciesDir =function(cmpDir, bowerDirName){
+        var indexInBower = cmpDir.indexOf(bowerDirName);
+        var dependenciesBaseDir = (indexInBower !== -1) ? cmpDir.substring(0, indexInBower) : cmpDir + '/';
+        return dependenciesBaseDir + bowerDirName;
+    };
+
     return lib;
 };

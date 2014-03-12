@@ -142,16 +142,18 @@ module.exports = function (grunt) {
         }
         var bower = grunt.file.readJSON(cmpDir + '/' + options.bowerFile);
 
-        var indexInBower = cmpDir.indexOf(options.bowerDir);
-        var dependenciesBaseDir = (indexInBower !== -1) ? cmpDir.substring(0, indexInBower) : cmpDir + '/';
+
 
         cmpUtil.createObject(bower, cmpDir, function (cmp) {
             if (!cmpUtil.getCmp(cmp.id)) {
                 var tasks = [];
                 //console.log(cmp);
 
+                //set dependencies dir
+                cmp.dependenciesDir = lib.getDependenciesDir(cmpDir,options.bowerDir);
+
                 lib.iterate(bower.dependencies, function (depName, depDetail) {
-                    var depDir = dependenciesBaseDir + options.bowerDir + '/' + depName;
+                    var depDir = cmp.dependenciesDir + '/' + depName;
                     //console.log('depDir=' + depDir);
                     tasks.push('cmpBuild:' + depDir + ':' + cmp.id);
                 });
@@ -177,6 +179,9 @@ module.exports = function (grunt) {
                 var dependencies = cmpUtil.getCmp(parentId).dependencies;
                 dependencies.push(cmp.id);
                 cmpUtil.setCmpField(parentId,'dependencies',dependencies);
+                if(cmp.type === 'template'){
+                    cmpUtil.setCmpField(parentId,'template',cmp.id);
+                }
             }
             done();
 
@@ -277,6 +282,7 @@ module.exports = function (grunt) {
 
         var options = this.options({
             get: 'main',
+            prefix: '',
             set: 'scripts'
         });
         var id = this.args[0];
@@ -291,7 +297,7 @@ module.exports = function (grunt) {
 
         function addScript(path, script) {
             var pointIndex = script.indexOf('./');
-            sources.push(path + '/' + (pointIndex === 0 ? script.substr(2) : script ));
+            sources.push(options.prefix + path + '/' + (pointIndex === 0 ? script.substr(2) : script ));
         }
 
         function addScripts(path, scripts) {

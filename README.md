@@ -13,8 +13,39 @@ Plugin for build and run multi-single page portal
 ## Getting Started
 This plugin requires Grunt `~0.4.2`
 
+To use an cmpObject, you must create a function named 'getCmp'  in Gruntfile.js
+
+    function getCmp(id){
+        return  grunt.config.get('components.' + (id === undefined ? grunt.task.current.args[0] : id));
+    }
+
+and add in taskConfig fields components as {} and cmp as getCmp function name
+
+    var taskConfig = {
+        ..
+        components: {},
+        cmp: getCmp,
+        ...
+    }
 
 ## Tasks
+
+### cmpBower
+load cmp dependencies
+
+    var taskConfig = {
+        ..
+        cmpBase: grunt.file.readJSON('cmp.json'),
+        cmpBower: {
+            options: {
+                baseDependencies: '<%= cmpBase.dependencies %>',
+                sourceFile: 'cmp.json',
+                repository: 'git+https://git.***.net:8443/git/portal/'
+            }
+        },
+        ...
+    }
+
 
 ### cmpBuild:
 create cmp object and his dependencies.
@@ -27,7 +58,8 @@ grunt cmpBuild:app.index
 grunt cmpBuild:template.base
 grunt cmpBuild:mode.sidebar
 
-
+    var taskConfig = {
+        ..
         cmpBuild: {
             options: {
                 app: {
@@ -80,10 +112,28 @@ grunt cmpBuild:mode.sidebar
                 }
             }
         },
+        ...
+    }
+
+Task cmpBuild creates objects cmpObject which contains the following fields:
+
+cmp().id: unique component id
+cmp().dir: component dir
+cmp().type: type (lib,mod,app,template) - taken in the name of the prefix components (mod | app | template) else 'lib'
+cmp().name: component name (from {bower.json}.name without prefix mod,app,template)
+cmp().fullName: full component name (from {bower.json}.name),
+cmp().version: component version (from {bower.json}.version),
+cmp().main: scripts (from {bower.json}.main),
+cmp().authors: автор (from {bower.json}.authors),
+cmp().dependencies: array identifiers dependent component
+cmp().dependenciesDir: root directory (generally {dir}/bower_components) which contain dependent components
+cmp().template: identifier template component (If the pattern is specified in dependencies)
 
 ###  cmpSet:
-dynamically set additional fields to cmp object
+dynamically set additional fields to cmpObject
 
+    var taskConfig = {
+        ..
         cmpSet: {
             options: {
                 src: '<%=cmp().dir %>/src',
@@ -118,10 +168,16 @@ dynamically set additional fields to cmp object
                 }
             }
         },
+        ...
+    }
 
 ###  cmpConfig:{
-dynamically generate config js object
+dynamically generate config object
+and stored in the field specified in the 'options.set'. (For example cmp().config )
+and save as js file
 
+    var taskConfig = {
+        ..
         cmpConfig: {
             app: {
                 options: {
@@ -138,10 +194,15 @@ dynamically generate config js object
                 }
             }
         },
+        ...
+    }
 
 ###  cmpScripts:
-dynamically collect scripts link from current and dependency cmp objects
+dynamically collect scripts link from current and dependency cmpObjects
+and stored in the field specified in the 'options.set'. (For example cmp().scripts )
 
+    var taskConfig = {
+        ..
         cmpScripts: {
             app: {
                 options: {
@@ -150,16 +211,5 @@ dynamically collect scripts link from current and dependency cmp objects
                 }
             }
         },
-
-###  cmpTemplate:
-find template object from dependencies and set his field from 'get',
-to set field in current object
-
-        cmpTemplate: {
-            app: {
-                options: {
-                    get: 'dest',
-                    set: 'assets'
-                }
-            }
-        },
+        ...
+    }
