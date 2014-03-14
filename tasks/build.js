@@ -55,26 +55,30 @@ module.exports = function (grunt) {
                     //override dependencies
                     depDetail = options.baseDependencies[depName];
                 }
-                var version = semver.clean(depDetail);
+                //var version = semver.clean(depDetail);
 
-                if (semver.valid(version)) {
+                if (depDetail.indexOf('.') === 0){
+                    if (grunt.file.exists(depDetail)){
+                        //is local folder
+                        localDependencies[depName] = depDetail;
+                        grunt.log.write( 'local cmp('+depName + ') ' + localDependencies[depName]+'\n');
+                        tasks.push('cmpBower:' + depDetail);
+                    }else{
+                        grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
+                    }
+                }else{
                     //is git repository
-                    var arr = depName.split('.');
                     if (cmpUtil.isCmpName(depName)) {
-                        dependencies[depName] = options.repository + depName + '.git#' + version;
+                        dependencies[depName] = options.repository + depName + '.git#' + depDetail;
                         grunt.log.write( 'git cmp('+depName + ') ' + dependencies[depName]+'\n');
                     } else {//is bower global lib
-                        dependencies[depName] = '=' + version;
+                        dependencies[depName] = depDetail;
                         grunt.log.write( 'bower cmp('+depName + ') ' + dependencies[depName]+'\n');
 
                     }
 
-                } else {
-                    //is local folder
-                    localDependencies[depName] = depDetail;
-                    grunt.log.write( 'local cmp('+depName + ') ' + localDependencies[depName]+'\n');
-                    tasks.push('cmpBower:' + depDetail);
                 }
+
             });
             if (!cmp.version) {
                 cmp.version = '0.0.0';
@@ -99,22 +103,44 @@ module.exports = function (grunt) {
 
             var done = this.async();
 
-            bower.commands.install([], {}, bowerConfig)
-                .on('log', function (logs) {
-                    grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
-                })
-                .on('prompt', function (prompts, callback) {
-                    inquirer.prompt(prompts, callback);
-                })
-                .on('error', function (errors) {
-                    grunt.fail.fatal(errors);
-                    done(false);
-                })
-                .on('end', function (result) {
-                    // console.log(result);
-                    grunt.log.ok('Success loaded to "'+cmpDir + '/' + options.bowerDir+'"');
-                    done();
-                });
+            if (grunt.file.exists(cmpDir + '/' + options.bowerDir)) {
+                //update
+                bower.commands.update([], {}, bowerConfig)
+                    .on('log', function (logs) {
+                        grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
+                    })
+                    .on('prompt', function (prompts, callback) {
+                        inquirer.prompt(prompts, callback);
+                    })
+                    .on('error', function (errors) {
+                        grunt.fail.fatal(errors);
+                        done(false);
+                    })
+                    .on('end', function (result) {
+                        // console.log(result);
+                        grunt.log.ok('Successfully updated directory "'+cmpDir + '/' + options.bowerDir+'"');
+                        done();
+                    });
+
+            }else{
+                //install
+                bower.commands.install([], {}, bowerConfig)
+                    .on('log', function (logs) {
+                        grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
+                    })
+                    .on('prompt', function (prompts, callback) {
+                        inquirer.prompt(prompts, callback);
+                    })
+                    .on('error', function (errors) {
+                        grunt.fail.fatal(errors);
+                        done(false);
+                    })
+                    .on('end', function (result) {
+                        // console.log(result);
+                        grunt.log.ok('Successfully installed in the directory "'+cmpDir + '/' + options.bowerDir+'"');
+                        done();
+                    });
+            }
 
         } else {
             grunt.fail.fatal('File ' + cmpDir + '/' + options.bower + ' not found ');

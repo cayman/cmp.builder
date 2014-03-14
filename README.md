@@ -31,7 +31,7 @@ and add in taskConfig fields components as {} and cmp as getCmp function name
 ## Tasks
 
 ### cmpBower
-load cmp dependencies
+load cmp dependencies or update
 
     var taskConfig = {
         ..
@@ -46,6 +46,22 @@ load cmp dependencies
         ...
     }
 
+cmp.json example:
+
+	{
+		"name": "portal.xx",
+		"dependencies": {
+			"jquery": "=2.0.3",
+			"angular": "=1.2.1",
+			"angular-ui-router": "=0.2.0",
+			"angular-bootstrap": "=0.6.0",
+			"template.new": "~0.1.1",
+			"app.index": "./app.index",
+			"app.services": "./app.services",
+			"app.catalogs": "./app.catalogs"
+		}
+	}
+	
 
 ### cmpBuild:
 create cmp object and his dependencies.
@@ -102,8 +118,6 @@ grunt cmpBuild:mode.sidebar
                         'jshint:cmp',
                         'clean:template',
                         'copy:template',
-                        'less:template',
-                        'sass:template',
                         'html2js:template',
                         'ngmin:cmp'
                     ]
@@ -117,17 +131,17 @@ grunt cmpBuild:mode.sidebar
 
 Task cmpBuild creates objects cmpObject which contains the following fields:
 
-cmp().id: unique component id
-cmp().dir: component dir
-cmp().type: type (lib,mod,app,template) - taken in the name of the prefix components (mod | app | template) else 'lib'
-cmp().name: component name (from {bower.json}.name without prefix mod,app,template)
-cmp().fullName: full component name (from {bower.json}.name),
-cmp().version: component version (from {bower.json}.version),
-cmp().main: scripts (from {bower.json}.main),
-cmp().authors: автор (from {bower.json}.authors),
-cmp().dependencies: array identifiers dependent component
-cmp().dependenciesDir: root directory (generally {dir}/bower_components) which contain dependent components
-cmp().template: identifier template component (If the pattern is specified in dependencies)
+	cmp().id: unique component id
+	cmp().dir: component dir
+	cmp().type: type (lib,mod,app,template) - taken in the name of the prefix components (mod | app | template) else 'lib'
+	cmp().name: component name (from {bower.json}.name without prefix mod,app,template)
+	cmp().fullName: full component name (from {bower.json}.name),
+	cmp().version: component version (from {bower.json}.version),
+	cmp().main: scripts (from {bower.json}.main),
+	cmp().authors: автор (from {bower.json}.authors),
+	cmp().dependencies: array identifiers dependent component
+	cmp().dependenciesDir: root directory (generally {dir}/bower_components) which contain dependent components
+	cmp().template: identifier template component (If the pattern is specified in dependencies)
 
 ###  cmpSet:
 dynamically set additional fields to cmpObject
@@ -207,6 +221,7 @@ and stored in the field specified in the 'options.set'. (For example cmp().scrip
             app: {
                 options: {
                     get: 'main',
+                    prefix: '/',					
                     set: 'scripts'
                 }
             }
