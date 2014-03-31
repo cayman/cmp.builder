@@ -110,6 +110,7 @@ module.exports = function (grunt) {
                         grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
                     })
                     .on('prompt', function (prompts, callback) {
+                        console.log(prompts);
                         inquirer.prompt(prompts, callback);
                     })
                     .on('error', function (errors) {
@@ -129,6 +130,7 @@ module.exports = function (grunt) {
                         grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
                     })
                     .on('prompt', function (prompts, callback) {
+                        console.log(prompts);
                         inquirer.prompt(prompts, callback);
                     })
                     .on('error', function (errors) {
@@ -340,10 +342,9 @@ module.exports = function (grunt) {
             cmpObject.dependencies.forEach(function (depId) {
                 var depObject = cmpUtil.getCmp(depId);
                 if (!dependencies[depObject.fullName]) {
+                    //In the script can be only one version of the library
                     dependencies[depObject.fullName] = depObject.version;
                     addScripts(depObject.path, depObject[options.get]);
-                } else if (dependencies[depObject.fullName] !== depObject.version) {
-                    grunt.fail.fatal('Error lib versions for dependencies');
                 }
                 iterateDependencies(depObject);
             });
@@ -355,31 +356,6 @@ module.exports = function (grunt) {
         cmpUtil.setCmpField(id, options.set, sources);
         grunt.log.ok('cmp(' + id + ').'+options.set + ' = {sources}');
 
-    });
-
-    grunt.registerMultiTask('cmpTemplate', 'cmp collect js scripts', function () {
-
-        var options = this.options({
-            get: 'path',
-            set: 'assets'
-        });
-        var id = this.args[0];
-        if (!id) {
-            grunt.fail.fatal('\n this.args[0] mast be component Id');
-        }
-
-        var cmp = cmpUtil.getCmp(id);
-        var variable = null;
-
-        cmp.dependencies.forEach(function (depId) {
-            var depObject = cmpUtil.getCmp(depId);
-            if (depObject.type === 'template') {
-                variable = depObject[options.get];
-            }
-        });
-
-        cmpUtil.setCmpField(this.args[0], options.set, variable);
-        grunt.log.ok('cmp(' + id + ').'+options.set + ' = ' + variable);
     });
 
 
