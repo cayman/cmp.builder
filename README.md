@@ -185,7 +185,7 @@ dynamically set additional fields to cmpObject
         ...
     }
 
-###  cmpConfig:{
+###  cmpConfig:
 dynamically generate config object
 and stored in the field specified in the 'options.set'. (For example cmp().config )
 and save as js file
