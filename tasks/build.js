@@ -1,13 +1,12 @@
 module.exports = function (grunt) {
-    console.log('Grunt lib build is loaded!');
+    console.log('Grunt cmp builder lib is loaded!');
 
     var lib = require('./lib/util').init(grunt);
     var cmpUtil = require('./lib/cmp').init(grunt);
     var merge = require('./lib/merge').init(grunt);
     var yaml = require('js-yaml');
     var bower = require('bower');
-    var semver = require('semver');
-    var inquirer = require('inquirer');
+    var cli = require('bower/lib/util/cli');
     var baseConfig = null;
 
     grunt.registerTask('cmpBower', 'cmp collect js scripts', function (dir) {
@@ -55,7 +54,6 @@ module.exports = function (grunt) {
                     //override dependencies
                     depDetail = options.baseDependencies[depName];
                 }
-                //var version = semver.clean(depDetail);
 
                 if (depDetail.indexOf('.') === 0){
                     if (grunt.file.exists(depDetail)){
@@ -102,47 +100,41 @@ module.exports = function (grunt) {
         if (grunt.file.exists(cmpDir + '/' + options.bowerFile)) {
 
             var done = this.async();
+            var renderer;
+            var logger;
+            var command;
 
             if (grunt.file.exists(cmpDir + '/' + options.bowerDir)) {
                 //update
-                bower.commands.update([], {}, bowerConfig)
-                    .on('log', function (logs) {
-                        grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
-                    })
-                    .on('prompt', function (prompts, callback) {
-                        console.log(prompts);
-                        inquirer.prompt(prompts, callback);
-                    })
-                    .on('error', function (errors) {
-                        grunt.fail.fatal(errors);
-                        done(false);
-                    })
-                    .on('end', function (result) {
-                        // console.log(result);
-                        grunt.log.ok('Successfully updated directory "'+cmpDir + '/' + options.bowerDir+'"');
-                        done();
-                    });
-
+                command = 'update';
+                logger = bower.commands.update([], {}, bowerConfig);
             }else{
                 //install
-                bower.commands.install([], {}, bowerConfig)
-                    .on('log', function (logs) {
-                        grunt.log.writeln('bower ' + logs.id + ' ' + logs.message);
-                    })
-                    .on('prompt', function (prompts, callback) {
-                        console.log(prompts);
-                        inquirer.prompt(prompts, callback);
-                    })
-                    .on('error', function (errors) {
-                        grunt.fail.fatal(errors);
-                        done(false);
-                    })
-                    .on('end', function (result) {
-                        // console.log(result);
-                        grunt.log.ok('Successfully installed in the directory "'+cmpDir + '/' + options.bowerDir+'"');
-                        done();
-                    });
+                command = 'install';
+                logger = bower.commands.install([], {}, bowerConfig);
             }
+
+            renderer = cli.getRenderer(command, logger.json, bowerConfig);
+
+            logger
+                .on('log', function (log) {
+                    renderer.log(log);
+                })
+                .on('prompt', function (prompt, callback) {
+                    renderer.prompt(prompt)
+                        .then(function (answer) {
+                            callback(answer);
+                        });
+                })
+                .on('error', function (error) {
+                    renderer.error(error);
+                    done(false);
+                })
+                .on('end', function (result) {
+                    renderer.end(result);
+                    done();
+                });
+
 
         } else {
             grunt.fail.fatal('File ' + cmpDir + '/' + options.bower + ' not found ');

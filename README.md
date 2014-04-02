@@ -7,7 +7,9 @@ grunt plugin
 Plugin for build and run multi-single page portal
 
 > Prepare several modules (mod.*) for build
+
 > Prepare several application (app.*) for build
+
 > Prepare template (template.*) for build
 
 ## Getting Started
@@ -68,11 +70,16 @@ create cmp object and his dependencies.
 
 The root component may be a mod, app, template or portal,
 depending on the passed parameter: the directory path components.
+
 For example
-grunt cmpBuild:.
-grunt cmpBuild:app.index
-grunt cmpBuild:template.base
-grunt cmpBuild:mode.sidebar
+> grunt cmpBuild:.
+
+> grunt cmpBuild:app.index
+
+> grunt cmpBuild:template.base
+
+> grunt cmpBuild:mode.sidebar
+
 
     var taskConfig = {
         ..
@@ -186,9 +193,9 @@ dynamically set additional fields to cmpObject
     }
 
 ###  cmpConfig:
-dynamically generate config object
-and stored in the field specified in the 'options.set'. (For example cmp().config )
-and save as js file
+dynamically generate config object,
+stored in the field specified in the 'options.set'. (For example cmp().config )
+and save as js file.
 
     var taskConfig = {
         ..

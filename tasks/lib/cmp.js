@@ -63,7 +63,7 @@ exports.init = function (grunt) {
 
 
     cmpUtil.getCmp = function (id){
-        return grunt.config.get('components.'+id);
+        return grunt.config.get('components.' + (id === undefined ? grunt.task.current.args[0] : id));
     };
 
     cmpUtil.setCmp = function (id,cmp){
