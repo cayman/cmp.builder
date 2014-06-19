@@ -53,10 +53,10 @@ cmp.json example:
 	{
 		"name": "portal.xx",
 		"dependencies": {
-			"jquery": "=2.0.3",
-			"angular": "=1.2.1",
-			"angular-ui-router": "=0.2.0",
-			"angular-bootstrap": "=0.6.0",
+			"jquery": "~2.0.3",
+			"angular": "~1.2.1",
+			"angular-ui-router": "~0.2.0",
+			"angular-bootstrap": "~0.8.0",
 			"template.new": "~0.1.1",
 			"app.index": "./app.index",
 			"app.services": "./app.services",

@@ -44,10 +44,13 @@ module.exports = function (grunt) {
         var tasks = [];
         var dependencies = {};
         var localDependencies = {};
+        var sourceFilePath = cmpDir + '/' + options.sourceFile;
+        var bowerFilePath = cmpDir + '/' + options.bowerFile;
+        var isSourceFileExist = grunt.file.exists(sourceFilePath);
 
-        if (grunt.file.exists(cmpDir + '/' + options.sourceFile)) {
+        if (isSourceFileExist) {
 
-            var cmp = grunt.file.readJSON(cmpDir + '/' + options.sourceFile);
+            var cmp = grunt.file.readJSON(sourceFilePath);
 
             lib.iterate(cmp.dependencies, function (depName, depDetail) {
                 if (options.baseDependencies[depName]) {
@@ -59,7 +62,7 @@ module.exports = function (grunt) {
                     if (grunt.file.exists(depDetail)){
                         //is local folder
                         localDependencies[depName] = depDetail;
-                        grunt.log.write( 'local cmp('+depName + ') ' + localDependencies[depName]+'\n');
+                        grunt.log.write( 'local cmp(' + depName + ') ' + localDependencies[depName]+'\n');
                         tasks.push('cmpBower:' + depDetail);
                     }else{
                         grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
@@ -68,10 +71,10 @@ module.exports = function (grunt) {
                     //is git repository
                     if (cmpUtil.isCmpName(depName)) {
                         dependencies[depName] = options.repository + depName + '.git#' + depDetail;
-                        grunt.log.write( 'git cmp('+depName + ') ' + dependencies[depName]+'\n');
+                        grunt.log.write( 'git cmp(' + depName + ') ' + dependencies[depName]+'\n');
                     } else {//is bower global lib
                         dependencies[depName] = depDetail;
-                        grunt.log.write( 'bower cmp('+depName + ') ' + dependencies[depName]+'\n');
+                        grunt.log.write( 'bower cmp(' + depName + ') ' + dependencies[depName]+'\n');
 
                     }
 
@@ -89,15 +92,15 @@ module.exports = function (grunt) {
             grunt.task.run(tasks);
 
             var bowerFile = JSON.stringify(cmp);
-            grunt.file.write( cmpDir + '/' + options.bowerFile, bowerFile);
-            grunt.log.ok('File "'+cmpDir + '/' + options.bowerFile + '" created.');
+            grunt.file.write(bowerFilePath, bowerFile);
+            grunt.log.ok('File "'+bowerFilePath + '" created.');
 
         } else {
-            grunt.log.warn('File ' + options.sourceFile + ' not found');
+            grunt.log.warn('File ' + sourceFilePath + ' not found');
 
         }
 
-        if (grunt.file.exists(cmpDir + '/' + options.bowerFile)) {
+        if (grunt.file.exists(bowerFilePath)) {
 
             var done = this.async();
             var renderer;
@@ -107,10 +110,13 @@ module.exports = function (grunt) {
             if (grunt.file.exists(cmpDir + '/' + options.bowerDir)) {
                 //update
                 command = 'update';
+                grunt.log.write( 'Started "bower update" command from ' + cmpDir + '/');
                 logger = bower.commands.update([], {}, bowerConfig);
+
             }else{
                 //install
                 command = 'install';
+                grunt.log.write( 'Started "bower install" command from ' + cmpDir + '/');
                 logger = bower.commands.install([], {}, bowerConfig);
             }
 
@@ -137,8 +143,11 @@ module.exports = function (grunt) {
 
 
         } else {
-            grunt.fail.fatal('File ' + cmpDir + '/' + options.bower + ' not found ');
-
+            if(isSourceFileExist) {
+                grunt.fail.fatal('File ' + bowerFilePath + ' not found ');
+            }else{
+                grunt.fail.fatal('Files ' + bowerFilePath + ' or '+ sourceFilePath +' not found ');
+            }
         }
 
     });
@@ -158,7 +167,7 @@ module.exports = function (grunt) {
         });
 
         if (!grunt.file.exists(cmpDir + '/' + options.bowerFile)) {
-            grunt.fail.fatal('\n file ' + cmpDir + '/' + options.bowerFile + ' not found');
+            grunt.fail.fatal('\n file ' + cmpDir + '/' + options.bowerFile + ' not found. Please start command "grunt cmpBower" ');
         }
         var bower = grunt.file.readJSON(cmpDir + '/' + options.bowerFile);
 
@@ -290,11 +299,11 @@ module.exports = function (grunt) {
 
         var jsFile = options.js.prefix + JSON.stringify(cmpConfig) + options.js.suffix;
         grunt.file.write(options.js.path, jsFile);
-        grunt.log.ok('file "'+options.js.path + '" created.');
+        grunt.log.ok('File "'+options.js.path + '" created.');
 
         var yamlFile = yaml.dump(cmpConfig);
-        grunt.file.write(options.yaml.path, yaml.dump(cmpConfig));
-        grunt.log.ok('file "'+options.yaml.path + '" created.');
+        grunt.file.write(options.yaml.path, yamlFile);
+        grunt.log.ok('File "'+options.yaml.path + '" created.');
 
     });
 
