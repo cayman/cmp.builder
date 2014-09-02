@@ -110,13 +110,13 @@ module.exports = function (grunt) {
             if (grunt.file.exists(cmpDir + '/' + options.bowerDir)) {
                 //update
                 command = 'update';
-                grunt.log.write( 'Started "bower update" command from ' + cmpDir + '/');
+                grunt.log.write( 'Started "bower update" command from ' + cmpDir + '/\n');
                 logger = bower.commands.update([], {}, bowerConfig);
 
             }else{
                 //install
                 command = 'install';
-                grunt.log.write( 'Started "bower install" command from ' + cmpDir + '/');
+                grunt.log.write( 'Started "bower install" command from ' + cmpDir + '/\n');
                 logger = bower.commands.install([], {}, bowerConfig);
             }
 
@@ -345,9 +345,10 @@ module.exports = function (grunt) {
                 if (!dependencies[depObject.fullName]) {
                     //In the script can be only one version of the library
                     dependencies[depObject.fullName] = depObject.version;
+
+                    iterateDependencies(depObject);
                     addScripts(depObject.path, depObject[options.get]);
                 }
-                iterateDependencies(depObject);
             });
         }
 
