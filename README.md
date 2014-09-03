@@ -203,15 +203,17 @@ and save as js file.
             app: {
                 options: {
                     sourceFile: 'config.yml',
-                    set: 'config',
-                    yaml: {
-                        path: '<%=cmp().dest %>/config.yml'
-                    },
-                    js: {
-                        path: '<%=cmp().dest %>/scripts/app-config.js',
-                        prefix: 'var _<%=cmp().name %>AppConfig = ',
-                        suffix: ';'
+                    srcField: 'src',    // get cmp().src  string
+                    pathField: 'path',  // get cmp().path  string
+
+                    set: 'config',      // set cmp().config  object
+
+                    write: { //save output javascript and yaml file
+                        jsVariable: '_<%=cmp().name %>AppConfig',  //global javascript variable for jsFile
+                        jsFile: '<%=cmp().dest %>/scripts/app-config.js',
+                        yamlFile: '<%=cmp().dest %>/config.yml'
                     }
+
                 }
             }
         },
@@ -227,9 +229,12 @@ and stored in the field specified in the 'options.set'. (For example cmp().scrip
         cmpScripts: {
             app: {
                 options: {
-                    get: 'main',
-                    prefix: '/',					
-                    set: 'scripts'
+                    prefix: '/',
+                    pathField: 'path',   // get cmp().path  string
+                    scriptField: 'main', // get cmp().main  string or array
+                    minScript: true,
+
+                    set: 'scripts'  // set cmp().scripts  array
                 }
             }
         },

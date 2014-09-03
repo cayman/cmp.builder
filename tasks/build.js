@@ -251,7 +251,12 @@ module.exports = function (grunt) {
 
         var options = this.options({
             sourceFile: 'config.yml',
-            set: 'config'
+            srcField: 'src',
+            pathField: 'path',
+            set: 'config',
+            write: {
+                jsVariable: '_appConfig'
+            }
         });
         var id = this.args[0];
         if (!id) {
@@ -266,52 +271,79 @@ module.exports = function (grunt) {
             baseConfig = grunt.file.readYAML(options.sourceFile);
         }
 
-        if (!grunt.file.exists(cmp.src + '/' + options.sourceFile)) {
-            grunt.fail.fatal('\n ' + cmp.src + '/' + options.sourceFile + ' not found');
+        if(!cmp[options.srcField]){
+            grunt.fail.fatal('\n field ' + options.srcField + 'in cmp(' + id + ') is empty ');
         }
-        var cmpConfig = grunt.file.readYAML(cmp.src + '/' + options.sourceFile);
+
+        if(!cmp[options.pathField]){
+            grunt.fail.fatal('\n field ' + options.pathField + 'in cmp(' + id + ') is empty ');
+        }
+
+        if (!grunt.file.exists(cmp[options.srcField] + '/' + options.sourceFile)) {
+            grunt.fail.fatal('\n ' + cmp[options.srcField] + '/' + options.sourceFile + ' not found');
+        }
+
+        var cmpConfig = grunt.file.readYAML(cmp[options.srcField] + '/' + options.sourceFile);
         merge.appConfigs(baseConfig, cmpConfig, cmp.name);
 
         cmp.dependencies.forEach(function (depId) {
             var depObject = cmpUtil.getCmp(depId);
             if (depObject.type === 'mod' || depObject.type === 'template') {
 //                console.log('depObject.src =' + depObject.src);
-                if (!grunt.file.exists(depObject.src + '/' + options.sourceFile)) {
-                    grunt.fail.fatal('\n config file ' + depObject.src + '/' + options.sourceFile + ' not found');
+
+                if(!depObject[options.srcField]){
+                    grunt.fail.fatal('\n field ' + options.srcField + 'in cmp(' + depId + ') is empty ');
                 }
-                var depConfig = grunt.file.readYAML(depObject.src + '/' + options.sourceFile);
+
+                if (!grunt.file.exists(depObject[options.srcField] + '/' + options.sourceFile)) {
+                    grunt.fail.fatal('\n config file ' + depObject[options.srcField] + '/' + options.sourceFile + ' not found');
+                }
+                var depConfig = grunt.file.readYAML(depObject[options.srcField] + '/' + options.sourceFile);
                 if (depObject.type === 'mod') {
                     merge.modConfigs(baseConfig, cmpConfig, depConfig, depObject.name, depObject.version);
                 } else {
                     merge.templateConfigs(baseConfig, cmpConfig, depConfig);
-                    cmpConfig[depObject.type].baseUrl = depObject.path;
+                    cmpConfig[depObject.type].baseUrl = depObject[options.pathField];
                 }
 
             }
         });
 
         if (cmpConfig[cmp.type]) {
-            cmpConfig[cmp.type].baseUrl = cmp.path;
-        }
+            cmpConfig[cmp.type].baseUrl = cmp[options.pathField];
+         }
 
         cmpUtil.setCmpField(id, options.set, cmpConfig);
         grunt.log.ok('cmp(' + id + ').'+options.set + ' = {config object}');
 
-        var jsFile = options.js.prefix + JSON.stringify(cmpConfig) + options.js.suffix;
-        grunt.file.write(options.js.path, jsFile);
-        grunt.log.ok('File "'+options.js.path + '" created.');
+        if(options.write.jsFile) {
+            var jsFile = 'var ' + options.write.jsVariable + ' = ' + JSON.stringify(cmpConfig) + ';';
+            grunt.file.write(options.write.jsFile, jsFile);
+            grunt.log.ok('File "' + options.write.jsFile + '" ( var '+options.write.jsVariable +' ) created.');
 
-        var yamlFile = yaml.dump(cmpConfig);
-        grunt.file.write(options.yaml.path, yamlFile);
-        grunt.log.ok('File "'+options.yaml.path + '" created.');
+        }else{
+            grunt.fail.fatal('\n options.write.jsFile not set ');
+
+        }
+
+        if(options.write.yamlFile) {
+            var yamlFile = yaml.dump(cmpConfig);
+            grunt.file.write(options.write.yamlFile, yamlFile);
+            grunt.log.ok('File "' + options.write.yamlFile + '" created.');
+        }
 
     });
 
     grunt.registerMultiTask('cmpScripts', 'cmp collect js scripts', function () {
 
+        var minJsExt = '.min.js';
+        var jsExt = '.js';
+
         var options = this.options({
-            get: 'main',
             prefix: '',
+            pathField: 'path',
+            scriptField: 'main',
+            minScript: false,
             set: 'scripts'
         });
         var id = this.args[0];
@@ -324,39 +356,63 @@ module.exports = function (grunt) {
 
         var sources = [];
 
-        function addScript(path, script) {
+        function addScript(path, script, setFirst) {
             var pointIndex = script.indexOf('./');
-            sources.push(options.prefix + path + '/' + (pointIndex === 0 ? script.substr(2) : script ));
+            var normalScript = (pointIndex === 0 ? script.substr(2) : script );
+
+            if(options.minScript){
+
+                if(normalScript.substr(-7) !== minJsExt && normalScript.substr(-3) === jsExt ) {
+                    normalScript = normalScript.replace(new RegExp("\.js$", 'i'), minJsExt);
+                }else if(normalScript.substr(-7) !== minJsExt){
+                    grunt.fail.fatal('\n error cmp['+options.scriptField+'] value:'+ script + ' must end in ' + jsExt );
+                }
+
+            } else {
+                if(normalScript.substr(-7)=== minJsExt ) {
+                    normalScript = normalScript.replace(new RegExp("\.min\.js$", 'i'), jsExt);
+                }else if(normalScript.substr(-3) !== jsExt){
+                    grunt.fail.fatal('\n error cmp['+options.scriptField+'] value:' + script + ' must end in ' + jsExt );
+                }
+            }
+
+            if(setFirst){
+                sources.unshift(options.prefix + path + '/' + normalScript);
+            }else{
+                sources.push(options.prefix + path + '/' + normalScript);
+            }
+
         }
 
-        function addScripts(path, scripts) {
+        function addCmpScripts(fullName, path, scripts) {
             if (scripts instanceof Array) {
                 scripts.forEach(function (script) {
                     addScript(path, script);
                 });
             } else {
-                addScript(path, scripts);
+                addScript(path, scripts, (fullName === 'jquery'));
             }
         }
 
-        function iterateDependencies(cmpObject) {
+        function iterateCmpDependencies(cmpObject) {
             cmpObject.dependencies.forEach(function (depId) {
                 var depObject = cmpUtil.getCmp(depId);
                 if (!dependencies[depObject.fullName]) {
                     //In the script can be only one version of the library
                     dependencies[depObject.fullName] = depObject.version;
 
-                    iterateDependencies(depObject);
-                    addScripts(depObject.path, depObject[options.get]);
+                    iterateCmpDependencies(depObject);
+                    addCmpScripts(depObject.fullName, depObject[options.pathField], depObject[options.scriptField]);
                 }
             });
         }
 
-        iterateDependencies(cmp);
-        addScripts(cmp.path, cmp[options.get]);
+        iterateCmpDependencies(cmp);
+        addCmpScripts(cmp.fullName, cmp[options.pathField], cmp[options.scriptField]);
 
         cmpUtil.setCmpField(id, options.set, sources);
-        grunt.log.ok('cmp(' + id + ').'+options.set + ' = {sources}');
+        grunt.log.ok('cmp(' + id + ').'+options.set + ' = [');
+        grunt.log.writeln("\t"+sources.join("\n\t")+' ]');
 
     });
 
