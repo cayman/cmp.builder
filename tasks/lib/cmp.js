@@ -2,9 +2,6 @@
 
 exports.init = function (grunt) {
 
-    var dirsum = require('dirsum');
-    var sh = require('shorthash');
-
     var cmpUtil = {};
 
     cmpUtil.isCmpName = function (name){
@@ -20,58 +17,30 @@ exports.init = function (grunt) {
         return false;
     };
 
-    var _objectsList = {};
 
-    cmpUtil.createObject = function (bower, cmpDir, done) {
-        // console.log('cmpDir= ' + cmpDir);
+    function components(){
+        var components = grunt._tempCmpObjectMap || ( grunt._tempCmpObjectMap = {} );
+        //console.log('components',Object.keys(components));
+        return components;
+    }
 
-        var key = 'dir' + cmpDir;
-        if (_objectsList.hasOwnProperty(key)) {
-            done(_objectsList[key]);
-        }else{
-            var isCmp = cmpUtil.isCmpName(bower.name);
-            var cmp = {
-                dir: cmpDir,
-                type: isCmp ? isCmp[0] : 'lib',
-                name: isCmp ? isCmp[1] : bower.name,
-                fullName: bower.name,
-                version: bower.version,
-                main: bower.main,
-                authors: bower.authors,
-                dependencies: []
-            };
-            _objectsList[key] = cmp;
 
-            if (bower.hashDir) {
-                dirsum.digest(cmpDir + '/' + bower.hashDir, 'md5', function (err, dirHashes) {
-                    if (err) {
-                        grunt.fail.fatal(err);
-                    }
-                    cmp.version = sh.unique(dirHashes.hash);
-                    cmp.id = cmp.type + '_' + cmp.name + '_' + cmp.version;
-                    done(cmp);
-                });
+    cmpUtil.getComponents = components;
 
-            } else {
-
-                cmp.id = cmp.type + '_' + cmp.name + '_' + cmp.version.replace(/\./g,'$');
-                done(cmp);
-            }
+    cmpUtil.getCmp = function (id) {
+        var cmpId = ( id === undefined ? grunt.task.current.args[0] : id );
+        var cmp = components()[cmpId];
+        if(!cmp) {
+            grunt.fail.fatal('\n component Id =' + cmpId + 'not exist');
         }
+       // console.log('get cmp ('+ cmpId +')',cmp);
+        return cmp;
 
     };
 
-
-    cmpUtil.getCmp = function (id){
-        return grunt.config.get('components.' + (id === undefined ? grunt.task.current.args[0] : id));
-    };
-
-    cmpUtil.setCmp = function (id,cmp){
-        grunt.config.set('components.'+id, cmp);
-    };
-
-    cmpUtil.setCmpField = function (id, fieldName, fieldValue){
-        grunt.config.set('components.'+id+'.'+fieldName, fieldValue);
+    cmpUtil.setCmp = function (id, cmp) {
+        //console.log('set cmp '+ id);
+        components()[id] = cmp;
     };
 
     return cmpUtil;

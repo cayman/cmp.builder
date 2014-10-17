@@ -1,6 +1,6 @@
 'use strict';
 
-exports.init = function (grunt) {
+exports.init = function () {
 
     var merge = {};
 

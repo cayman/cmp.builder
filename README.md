@@ -15,18 +15,16 @@ Plugin for build and run multi-single page portal
 ## Getting Started
 This plugin requires Grunt `~0.4.2`
 
-To use an cmpObject, you must create a function named 'getCmp'  in Gruntfile.js
+To use an cmpObject, you must load lib cmpUtil and use a function named 'getCmp'  in Gruntfile.js
 
-    function getCmp(id){
-        return  grunt.config.get('components.' + (id === undefined ? grunt.task.current.args[0] : id));
-    }
+    var cmpUtil = require('./temp/cmp.builder/tasks/lib/cmp.js').init(grunt);  
 
-and add in taskConfig fields components as {} and cmp as getCmp function name
+and add in taskConfig fields components as {} and cmp as cmpUtil.getCmp function name
 
     var taskConfig = {
         ..
         components: {},
-        cmp: getCmp,
+        cmp: cmpUtil.getCmp,
         ...
     }
 
@@ -232,8 +230,8 @@ and stored in the field specified in the 'options.set'. (For example cmp().scrip
                     prefix: '/',
                     pathField: 'path',   // get cmp().path  string
                     scriptField: 'main', // get cmp().main  string or array
-                    minScript: true,
-
+                    minScript: false, // use min.js in scripts
+                    verParam: false, // add ?ver={cmp().version} to scripts suffix
                     set: 'scripts'  // set cmp().scripts  array
                 }
             }

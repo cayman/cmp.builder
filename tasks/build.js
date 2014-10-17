@@ -7,6 +7,8 @@ module.exports = function (grunt) {
     var yaml = require('js-yaml');
     var bower = require('bower');
     var cli = require('bower/lib/util/cli');
+    var dirsum = require('dirsum');
+    var sh = require('shorthash');
     var baseConfig = null;
 
     grunt.registerTask('cmpBower', 'cmp collect js scripts', function (dir) {
@@ -58,23 +60,23 @@ module.exports = function (grunt) {
                     depDetail = options.baseDependencies[depName];
                 }
 
-                if (depDetail.indexOf('.') === 0){
-                    if (grunt.file.exists(depDetail)){
+                if (depDetail.indexOf('.') === 0) {
+                    if (grunt.file.exists(depDetail)) {
                         //is local folder
                         localDependencies[depName] = depDetail;
-                        grunt.log.write( 'local cmp(' + depName + ') ' + localDependencies[depName]+'\n');
+                        grunt.log.write('local cmp(' + depName + ') ' + localDependencies[depName] + '\n');
                         tasks.push('cmpBower:' + depDetail);
-                    }else{
+                    } else {
                         grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
                     }
-                }else{
+                } else {
                     //is git repository
                     if (cmpUtil.isCmpName(depName)) {
                         dependencies[depName] = options.repository + depName + '.git#' + depDetail;
-                        grunt.log.write( 'git cmp(' + depName + ') ' + dependencies[depName]+'\n');
+                        grunt.log.write('git cmp(' + depName + ') ' + dependencies[depName] + '\n');
                     } else {//is bower global lib
                         dependencies[depName] = depDetail;
-                        grunt.log.write( 'bower cmp(' + depName + ') ' + dependencies[depName]+'\n');
+                        grunt.log.write('bower cmp(' + depName + ') ' + dependencies[depName] + '\n');
 
                     }
 
@@ -93,7 +95,7 @@ module.exports = function (grunt) {
 
             var bowerFile = JSON.stringify(cmp);
             grunt.file.write(bowerFilePath, bowerFile);
-            grunt.log.ok('File "'+bowerFilePath + '" created.');
+            grunt.log.ok('File "' + bowerFilePath + '" created.');
 
         } else {
             grunt.log.warn('File ' + sourceFilePath + ' not found');
@@ -110,13 +112,13 @@ module.exports = function (grunt) {
             if (grunt.file.exists(cmpDir + '/' + options.bowerDir)) {
                 //update
                 command = 'update';
-                grunt.log.write( 'Started "bower update" command from ' + cmpDir + '/\n');
+                grunt.log.write('Started "bower update" command from ' + cmpDir + '/\n');
                 logger = bower.commands.update([], {}, bowerConfig);
 
-            }else{
+            } else {
                 //install
                 command = 'install';
-                grunt.log.write( 'Started "bower install" command from ' + cmpDir + '/\n');
+                grunt.log.write('Started "bower install" command from ' + cmpDir + '/\n');
                 logger = bower.commands.install([], {}, bowerConfig);
             }
 
@@ -143,78 +145,195 @@ module.exports = function (grunt) {
 
 
         } else {
-            if(isSourceFileExist) {
+            if (isSourceFileExist) {
                 grunt.fail.fatal('File ' + bowerFilePath + ' not found ');
-            }else{
-                grunt.fail.fatal('Files ' + bowerFilePath + ' or '+ sourceFilePath +' not found ');
+            } else {
+                grunt.fail.fatal('Files ' + bowerFilePath + ' or ' + sourceFilePath + ' not found ');
             }
         }
 
     });
+
+
+    var _componentDirs = {};
+    var _bowersList = {};
+
+
+    function addDependency(cmp, depCmp) {
+        grunt.log.ok('cmp(' + cmp.id + ').dependencies[] = '+depCmp.id.cyan);
+        cmp.dependencies.push(depCmp.id);
+        if (depCmp.type === 'template') {
+            grunt.log.ok('cmp(' + cmp.id + ').template = '+depCmp.id.cyan);
+            cmp.template = depCmp.id;
+        }
+    }
+
+    function addDependencyOrTask(tasks, cmp, depDir) {
+        if (_componentDirs.hasOwnProperty(depDir)) {
+            addDependency(cmp, cmpUtil.getCmp(_componentDirs[depDir]));
+        } else {
+            var bower = readBower(depDir);
+            var depId = getSimpleId(bower);
+            var depCmp;
+            if(depId && (depCmp = cmpUtil.getComponents()[depId])){
+                _componentDirs[depDir] = depId;
+                addDependency(cmp, depCmp);
+            }else{
+                tasks.push('cmpBuild:' + depDir + ':' + cmp.id);
+            }
+        }
+    }
+
+    function readBower(dir){
+        var bower = _bowersList[dir];
+        if(!bower) {
+            if (!grunt.file.exists(dir + '/bower.json')) {
+                grunt.fail.fatal('\n file ' + dir + '/bower.json not found. Please start command "grunt cmpBower" ');
+            }
+            _bowersList[dir] = bower = grunt.file.readJSON(dir + '/bower.json');
+        }
+        return bower;
+    }
+
+    function getSimpleId(bower) {
+
+        var isCmp = cmpUtil.isCmpName(bower.name);
+        var type = isCmp ? isCmp[0] : 'lib';
+        var name = isCmp ? isCmp[1] : bower.name;
+
+        if (!bower.hashDir) {
+            return type + '_' + name + '_' + bower.version.replace(/\./g, '$');
+        }
+
+        return false;
+    }
+
+    function createCmp(id, cmpDir, bower, options){
+        var isCmp = cmpUtil.isCmpName(bower.name);
+        var cmp = {};
+        cmp.dir = cmpDir;
+        cmp.type = isCmp ? isCmp[0] : 'lib';
+        cmp.name = isCmp ? isCmp[1] : bower.name;
+        cmp.version = bower.version;
+        cmp.id = id ? id : cmp.type + '_' + cmp.name + '_' + bower.version;
+        cmp.fullName = bower.name;
+        cmp.dependencies =  [];
+        cmp.main = bower.main;
+        cmp.authors = bower.authors;
+        cmp.dependenciesDir = lib.getDependenciesDir(cmp.dir, options.bowerDir);
+
+        grunt.log.ok('Created cmp(' + cmp.id + ') from ' + cmp.dir.cyan);
+        grunt.verbose.writeln('='.cyan, cmp);
+
+        var tasks = [];
+
+        lib.iterate(bower.dependencies, function (depName, depDetail) {
+
+            addDependencyOrTask(tasks, cmp, cmp.dependenciesDir + '/' + depName)
+
+        });
+
+        lib.iterate(bower.localDependencies, function (depName, depDetail) {
+
+            addDependencyOrTask(tasks, cmp, depDetail);
+
+        });
+
+        lib.addTasks(tasks, options[cmp.type], cmp.id);
+
+
+        //first performs the task for dependencies
+        if (tasks.length > 0) {
+            grunt.verbose.writeln('>>'.cyan +' tasks +=', tasks);
+            grunt.task.run(tasks);
+
+        }
+
+        cmpUtil.setCmp(cmp.id, cmp);
+
+        return cmp;
+    }
+
+    function splitFields(object){
+        var count = 0;
+        for (var property in object) {
+                count++;
+        }
+        return ''+count;
+    }
+
 
     grunt.registerTask('cmpBuild', 'component init task', function (dir, parentId) {
         // Merge task-specific and/or target-specific options with these defaults.
         var done = this.async();
         var cmpDir = dir;
 
+        grunt.log.writeln('>>  component dirs =',splitFields(_componentDirs).green);
+        grunt.log.writeln('>>  bower files =',splitFields(_bowersList).green);
+        grunt.log.writeln('>>  components =',splitFields(cmpUtil.getComponents()).green);
+
         if (!dir) {  //default dir
             cmpDir = '.';
         }
 
         var options = this.options({
-            bowerFile: 'bower.json',
             bowerDir: 'bower_components'
         });
 
-        if (!grunt.file.exists(cmpDir + '/' + options.bowerFile)) {
-            grunt.fail.fatal('\n file ' + cmpDir + '/' + options.bowerFile + ' not found. Please start command "grunt cmpBower" ');
-        }
-        var bower = grunt.file.readJSON(cmpDir + '/' + options.bowerFile);
-
-
-
-        cmpUtil.createObject(bower, cmpDir, function (cmp) {
-            if (!cmpUtil.getCmp(cmp.id)) {
-                var tasks = [];
-                //console.log(cmp);
-
-                //set dependencies dir
-                cmp.dependenciesDir = lib.getDependenciesDir(cmpDir,options.bowerDir);
-
-                lib.iterate(bower.dependencies, function (depName, depDetail) {
-                    var depDir = cmp.dependenciesDir + '/' + depName;
-                    //console.log('depDir=' + depDir);
-                    tasks.push('cmpBuild:' + depDir + ':' + cmp.id);
-                });
-                lib.iterate(bower.localDependencies, function (depName, depDetail) {
-                    var depDir = depDetail;
-                    //console.log('depDir=' + depDir);
-                    tasks.push('cmpBuild:' + depDir + ':' + cmp.id);
-                });
-
-                lib.addTasks(tasks, options[cmp.type], cmp.id);
-
-                cmpUtil.setCmp(cmp.id, cmp );
-
-                //first performs the task for dependencies
-                if (tasks.length > 0) {
-                    //console.log('run ' + tasks);
-                    grunt.task.run(tasks);
-                }
-                grunt.log.ok('cmp id = ' + cmp.id + ' was created');
-            }
-
+        if (_componentDirs.hasOwnProperty(cmpDir)) {
+            grunt.verbose.writeln('\t cmp(' + _componentDirs.hasOwnProperty(cmpDir) +') already exist');
             if (parentId) {
-                var dependencies = cmpUtil.getCmp(parentId).dependencies;
-                dependencies.push(cmp.id);
-                cmpUtil.setCmpField(parentId,'dependencies',dependencies);
-                if(cmp.type === 'template'){
-                    cmpUtil.setCmpField(parentId,'template',cmp.id);
-                }
+                addDependency(cmpUtil.getCmp(parentId), cmpUtil.getCmp(_componentDirs[cmpDir]));
             }
             done();
 
-        });
+        } else {
+            //load bower file
+            var bower = readBower(cmpDir);
+
+            //is Cmp component object
+            var id = getSimpleId(bower);
+            var cmp = null;
+
+            if(id){
+
+                if(!bower.version){
+                    grunt.fail.fatal('Files ' + cmpDir + '/' + options.bowerFile + ' mast have version or hashDir field');
+                }
+
+                cmp = cmpUtil.getComponents()[id];
+                if(!cmp) {
+                    cmp = createCmp(id, cmpDir, bower, options);
+                }
+                if (parentId) {
+                    addDependency(cmpUtil.getCmp(parentId), cmp);
+                }
+
+                _componentDirs[cmpDir] = id;
+
+                done();
+
+            }else{
+                dirsum.digest(cmpDir + '/' + bower.hashDir, 'md5', function (err, dirHashes) {
+                    if (err) {
+                        grunt.fail.fatal(err);
+                    }
+                    bower.version = sh.unique(dirHashes.hash);
+
+                    cmp = createCmp(null, cmpDir, bower, options);
+
+                    if (parentId) {
+                        addDependency(cmpUtil.getCmp(parentId), cmp);
+                    }
+
+                    _componentDirs[cmpDir] = cmp.id;
+
+                    done();
+                });
+
+            }
+
+        }
 
     });
 
@@ -227,12 +346,15 @@ module.exports = function (grunt) {
         if (!id) {
             grunt.fail.fatal('\n this.args[0] mast be component Id');
         }
+        var cmp = cmpUtil.getCmp(id);
+
         lib.iterate(options, function (fieldName, fieldValue) {
-            cmpUtil.setCmpField(id, fieldName, fieldValue);
-            grunt.log.ok('cmp(' + id + ').'+fieldName + " = " + fieldValue);
+            cmp[fieldName] = fieldValue;
+            grunt.log.ok('cmp(' + id + ').' + fieldName + " = " + fieldValue.toString().cyan);
         });
 
     });
+
 
     grunt.registerTask('cmpTest', 'cmp save fields', function () {
 
@@ -271,11 +393,11 @@ module.exports = function (grunt) {
             baseConfig = grunt.file.readYAML(options.sourceFile);
         }
 
-        if(!cmp[options.srcField]){
+        if (!cmp[options.srcField]) {
             grunt.fail.fatal('\n field ' + options.srcField + 'in cmp(' + id + ') is empty ');
         }
 
-        if(!cmp[options.pathField]){
+        if (!cmp[options.pathField]) {
             grunt.fail.fatal('\n field ' + options.pathField + 'in cmp(' + id + ') is empty ');
         }
 
@@ -291,7 +413,7 @@ module.exports = function (grunt) {
             if (depObject.type === 'mod' || depObject.type === 'template') {
 //                console.log('depObject.src =' + depObject.src);
 
-                if(!depObject[options.srcField]){
+                if (!depObject[options.srcField]) {
                     grunt.fail.fatal('\n field ' + options.srcField + 'in cmp(' + depId + ') is empty ');
                 }
 
@@ -311,25 +433,25 @@ module.exports = function (grunt) {
 
         if (cmpConfig[cmp.type]) {
             cmpConfig[cmp.type].baseUrl = cmp[options.pathField];
-         }
+        }
 
-        cmpUtil.setCmpField(id, options.set, cmpConfig);
-        grunt.log.ok('cmp(' + id + ').'+options.set + ' = {config object}');
+        cmp[options.set] = cmpConfig;
+        grunt.log.ok('cmp(' + id + ').' + options.set + ' = {merged config object}');
 
-        if(options.write.jsFile) {
+        if (options.write.jsFile) {
             var jsFile = 'var ' + options.write.jsVariable + ' = ' + JSON.stringify(cmpConfig) + ';';
             grunt.file.write(options.write.jsFile, jsFile);
-            grunt.log.ok('File "' + options.write.jsFile + '" ( var '+options.write.jsVariable +' ) created.');
+            grunt.log.ok('File ' + options.write.jsFile.cyan + ' = ' + ('"var ' + options.write.jsVariable + ' = {..};"').green + ' created.');
 
-        }else{
+        } else {
             grunt.fail.fatal('\n options.write.jsFile not set ');
 
         }
 
-        if(options.write.yamlFile) {
+        if (options.write.yamlFile) {
             var yamlFile = yaml.dump(cmpConfig);
             grunt.file.write(options.write.yamlFile, yamlFile);
-            grunt.log.ok('File "' + options.write.yamlFile + '" created.');
+            grunt.log.ok('File ' + options.write.yamlFile.cyan + ' created.');
         }
 
     });
@@ -344,6 +466,7 @@ module.exports = function (grunt) {
             pathField: 'path',
             scriptField: 'main',
             minScript: false,
+            verParam: false,
             set: 'scripts'
         });
         var id = this.args[0];
@@ -356,41 +479,48 @@ module.exports = function (grunt) {
 
         var sources = [];
 
-        function addScript(path, script, setFirst) {
+        function parseScript(path, script, verParam) {
             var pointIndex = script.indexOf('./');
             var normalScript = (pointIndex === 0 ? script.substr(2) : script );
 
-            if(options.minScript){
+            if (options.minScript) {
 
-                if(normalScript.substr(-7) !== minJsExt && normalScript.substr(-3) === jsExt ) {
+                if (normalScript.substr(-7) !== minJsExt && normalScript.substr(-3) === jsExt) {
                     normalScript = normalScript.replace(new RegExp("\.js$", 'i'), minJsExt);
-                }else if(normalScript.substr(-7) !== minJsExt){
-                    grunt.fail.fatal('\n error cmp['+options.scriptField+'] value:'+ script + ' must end in ' + jsExt );
+                } else if (normalScript.substr(-7) !== minJsExt) {
+                    grunt.fail.fatal('\n error cmp[' + options.scriptField + '] value:' + script + ' must end in ' + jsExt);
                 }
 
             } else {
-                if(normalScript.substr(-7)=== minJsExt ) {
+                if (normalScript.substr(-7) === minJsExt) {
                     normalScript = normalScript.replace(new RegExp("\.min\.js$", 'i'), jsExt);
-                }else if(normalScript.substr(-3) !== jsExt){
-                    grunt.fail.fatal('\n error cmp['+options.scriptField+'] value:' + script + ' must end in ' + jsExt );
+                } else if (normalScript.substr(-3) !== jsExt) {
+                    grunt.fail.fatal('\n error cmp[' + options.scriptField + '] value:' + script + ' must end in ' + jsExt);
                 }
             }
 
-            if(setFirst){
-                sources.unshift(options.prefix + path + '/' + normalScript);
-            }else{
-                sources.push(options.prefix + path + '/' + normalScript);
-            }
+
+            return options.prefix + path + '/' + normalScript + (verParam?'?ver='+verParam:'');
 
         }
 
-        function addCmpScripts(fullName, path, scripts) {
+        function addCmpScripts(cmpObject) {
+
+            var path = cmpObject[options.pathField];
+            var scripts = cmpObject[options.scriptField];
+            var verParam = options.verParam ? cmpObject.version : null;
+
             if (scripts instanceof Array) {
                 scripts.forEach(function (script) {
-                    addScript(path, script);
+                    sources.push(parseScript(path, script, verParam));
                 });
             } else {
-                addScript(path, scripts, (fullName === 'jquery'));
+                if (cmpObject.fullName === 'jquery') {
+                    sources.unshift(parseScript(path, scripts, verParam));
+                } else {
+                    sources.push(parseScript(path, scripts, verParam));
+                }
+
             }
         }
 
@@ -402,17 +532,20 @@ module.exports = function (grunt) {
                     dependencies[depObject.fullName] = depObject.version;
 
                     iterateCmpDependencies(depObject);
-                    addCmpScripts(depObject.fullName, depObject[options.pathField], depObject[options.scriptField]);
+                    addCmpScripts(depObject);
+                }else if(dependencies[depObject.fullName] !== depObject.version){
+                    grunt.log.warn('conflict ' + depObject.fullName + ' versions:',dependencies[depObject.fullName],depObject.version);
                 }
             });
         }
 
-        iterateCmpDependencies(cmp);
-        addCmpScripts(cmp.fullName, cmp[options.pathField], cmp[options.scriptField]);
+        grunt.verbose.writeln('>>'.cyan + ' cmp(' + id + ').dependencies =', cmp.dependencies.toString().cyan);
 
-        cmpUtil.setCmpField(id, options.set, sources);
-        grunt.log.ok('cmp(' + id + ').'+options.set + ' = [');
-        grunt.log.writeln("\t"+sources.join("\n\t")+' ]');
+        iterateCmpDependencies(cmp);
+        addCmpScripts(cmp);
+
+        cmp[options.set] = sources;
+        grunt.log.ok('cmp(' + id + ').' + options.set + ' = ['+ sources.join(',').cyan + ' ]');
 
     });
 
