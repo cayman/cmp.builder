@@ -28,18 +28,27 @@ exports.init = function (grunt) {
     cmpUtil.getComponents = components;
 
     cmpUtil.getCmp = function (id) {
-        var cmpId = ( id === undefined ? grunt.task.current.args[0] : id );
-        var cmp = components()[cmpId];
-        if(!cmp) {
-            grunt.fail.fatal('\n component Id =' + cmpId + 'not exist');
+
+        if(!id){
+            if(!grunt.task.current.args[0]) {
+                grunt.fail.fatal('\n component id is not specified');
+            }else{
+                id = grunt.task.current.args[0];
+            }
         }
-       // console.log('get cmp ('+ cmpId +')',cmp);
+
+        var cmp = components()[id];
+        if(!cmp) {
+            grunt.fail.fatal('\n component Id =' + id + 'not exist');
+        }
         return cmp;
 
     };
 
     cmpUtil.setCmp = function (id, cmp) {
-        //console.log('set cmp '+ id);
+        if(!id){
+             grunt.fail.fatal('\n component id is not specified');
+        }
         components()[id] = cmp;
     };
 

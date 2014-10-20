@@ -159,6 +159,20 @@ module.exports = function (grunt) {
     var _bowersList = {};
 
 
+    function getSimpleId(bower) {
+
+        var isCmp = cmpUtil.isCmpName(bower.name);
+        var type = isCmp ? isCmp[0] : 'lib';
+        var name = isCmp ? isCmp[1] : bower.name;
+
+        if (!bower.hashDir) {
+            return type + '_' + name + '_' + bower.version.replace(/\./g, '$');
+        }
+
+        return false;
+    }
+
+
     function addDependency(cmp, depCmp) {
         grunt.log.ok('cmp(' + cmp.id + ').dependencies[] = '+depCmp.id.cyan);
         cmp.dependencies.push(depCmp.id);
@@ -195,32 +209,22 @@ module.exports = function (grunt) {
         return bower;
     }
 
-    function getSimpleId(bower) {
-
-        var isCmp = cmpUtil.isCmpName(bower.name);
-        var type = isCmp ? isCmp[0] : 'lib';
-        var name = isCmp ? isCmp[1] : bower.name;
-
-        if (!bower.hashDir) {
-            return type + '_' + name + '_' + bower.version.replace(/\./g, '$');
-        }
-
-        return false;
-    }
-
     function createCmp(id, cmpDir, bower, options){
         var isCmp = cmpUtil.isCmpName(bower.name);
-        var cmp = {};
-        cmp.dir = cmpDir;
-        cmp.type = isCmp ? isCmp[0] : 'lib';
-        cmp.name = isCmp ? isCmp[1] : bower.name;
-        cmp.version = bower.version;
-        cmp.id = id ? id : cmp.type + '_' + cmp.name + '_' + bower.version;
-        cmp.fullName = bower.name;
-        cmp.dependencies =  [];
-        cmp.main = bower.main;
-        cmp.authors = bower.authors;
-        cmp.dependenciesDir = lib.getDependenciesDir(cmp.dir, options.bowerDir);
+
+        var cmp = {
+            dir: cmpDir,
+            type: (isCmp ? isCmp[0] : 'lib'),
+            name: (isCmp ? isCmp[1] : bower.name),
+            version: bower.version,
+            fullName: bower.name,
+            dependencies: [],
+            main: bower.main,
+            authors: bower.authors
+        };
+
+        cmp.id = id ? id : cmp.type + '_' + cmp.name + '_' + cmp.version ;
+        cmp.dependenciesDir = lib.getDependenciesDir(cmpDir, options.bowerDir);
 
         grunt.log.ok('Created cmp(' + cmp.id + ') from ' + cmp.dir.cyan);
         grunt.verbose.writeln('='.cyan, cmp);
@@ -254,13 +258,7 @@ module.exports = function (grunt) {
         return cmp;
     }
 
-    function splitFields(object){
-        var count = 0;
-        for (var property in object) {
-                count++;
-        }
-        return ''+count;
-    }
+
 
 
     grunt.registerTask('cmpBuild', 'component init task', function (dir, parentId) {
@@ -268,9 +266,9 @@ module.exports = function (grunt) {
         var done = this.async();
         var cmpDir = dir;
 
-        grunt.log.writeln('>>  component dirs =',splitFields(_componentDirs).green);
-        grunt.log.writeln('>>  bower files =',splitFields(_bowersList).green);
-        grunt.log.writeln('>>  components =',splitFields(cmpUtil.getComponents()).green);
+        grunt.log.write('>> build dirs =',lib.fieldsCount(_componentDirs).green);
+        grunt.log.write(', bowers =',lib.fieldsCount(_bowersList).green);
+        grunt.log.writeln(', components =',lib.fieldsCount(cmpUtil.getComponents()).green);
 
         if (!dir) {  //default dir
             cmpDir = '.';
@@ -510,17 +508,19 @@ module.exports = function (grunt) {
             var scripts = cmpObject[options.scriptField];
             var verParam = options.verParam ? cmpObject.version : null;
 
-            if (scripts instanceof Array) {
-                scripts.forEach(function (script) {
-                    sources.push(parseScript(path, script, verParam));
-                });
-            } else {
-                if (cmpObject.fullName === 'jquery') {
-                    sources.unshift(parseScript(path, scripts, verParam));
+            if(scripts) {
+                if (scripts instanceof Array) {
+                    scripts.forEach(function (script) {
+                        sources.push(parseScript(path, script, verParam));
+                    });
                 } else {
-                    sources.push(parseScript(path, scripts, verParam));
-                }
+                    if (cmpObject.fullName === 'jquery') {
+                        sources.unshift(parseScript(path, scripts, verParam));
+                    } else {
+                        sources.push(parseScript(path, scripts, verParam));
+                    }
 
+                }
             }
         }
 

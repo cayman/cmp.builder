@@ -22,6 +22,14 @@ exports.init = function (grunt) {
 
     };
 
+    lib.fieldsCount =function (object){
+        var count = 0;
+        for (var property in object) {
+            count++;
+        }
+        return ''+count;
+    };
+
     lib.addTasks = function(tasks,options,param){
         if(options && options.tasks){
             //add tasks
