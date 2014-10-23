@@ -5,6 +5,23 @@ exports.init = function (grunt) {
 
     var lib = {};
 
+    lib.log = function(field, value, prefix){
+        var assign = prefix ? ' ' + prefix + ' ' : ' = ';
+        if (!value) {
+            return prefix ? field + assign : field;
+        } else if (typeof value === 'string') {
+            return field + assign + value.cyan;
+        } else if (value instanceof Array) {
+//            if(value.length < 15 || value.length > 40 ){
+                return field + assign + '[ ' + value.join(', ').cyan + ' ]';
+//            }else{
+//                return field + assign + '[\n\t\t' + value.join(',\n\t\t') + ' ]';
+//            }
+
+        } else {
+            return field + assign + '{ ' + (typeof value) + ':' + value.toString().cyan + ' }';
+        }
+    };
 
     lib.iterate = function(object, callback) {
         if(object instanceof Array ){
@@ -22,7 +39,11 @@ exports.init = function (grunt) {
 
     };
 
-    lib.fieldsCount =function (object){
+    lib.equalExt = function (file, ext) {
+        return  file.substr(-ext.length) === ext;
+    };
+
+    lib.fieldsCount = function (object){
         var count = 0;
         for (var property in object) {
             count++;
