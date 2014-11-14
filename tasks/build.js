@@ -10,7 +10,6 @@ module.exports = function (grunt) {
     var dirsum = require('dirsum');
     var sh = require('shorthash');
 
-
     function isBowerDependency(depDetail){
 
         return depDetail.indexOf(":")>=0 || lib.equalName(depDetail,'~') ||
