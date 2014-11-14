@@ -23,7 +23,6 @@ and add in taskConfig fields components as {} and cmp as cmpUtil.getCmp function
 
     var taskConfig = {
         ..
-        components: {},
         cmp: cmpUtil.getCmp,
         ...
     }
@@ -31,20 +30,29 @@ and add in taskConfig fields components as {} and cmp as cmpUtil.getCmp function
 ## Tasks
 
 ### cmpBower
-load cmp dependencies or update
+
+load cmp.json, overrade dependencies from root cmp.json and generate bower.json
+after load dependencies or update for bower.json
 
     var taskConfig = {
         ..
-        cmpBase: grunt.file.readJSON('cmp.json'),
         cmpBower: {
             options: {
-                baseDependencies: '<%= cmpBase.dependencies %>',
                 sourceFile: 'cmp.json',
                 repository: 'git+https://git.***.net:8443/git/portal/'
             }
         },
         ...
     }
+
+run task
+
+    cmpBower:{path}
+
+For example
+> grunt cmpBower
+
+> grunt cmpBower:./app.index
 
 cmp.json example:
 
@@ -69,8 +77,14 @@ create cmp object and his dependencies.
 The root component may be a mod, app, template or portal,
 depending on the passed parameter: the directory path components.
 
+run task
+
+    grunt cmpBuild:{path}:{parent cmpId}
+
 For example
 > grunt cmpBuild:.
+
+> grunt cmpBuild:./app.index
 
 > grunt cmpBuild:app.index
 
@@ -156,11 +170,12 @@ dynamically set additional fields to cmpObject
         cmpSet: {
             options: {
                 src: '<%=cmp().dir %>/src',
-                path: '<%=cmp().type %>/<%=cmp().name %>/<%=cmp().version %>',
+                path: '/<%=cmp().type %>/<%=cmp().name %>/<%=cmp().version %>',
                 dest: '<%=build %>/<%=cmp().type %>/<%=cmp().name %>/<%=cmp().version %>'
             },
             app: {
                 options: {
+                    config: '<%=cmp().dir %>/src/config.yml',
                     main: [
                         'scripts/app-config.js',
                         'scripts/app.js',
@@ -170,6 +185,7 @@ dynamically set additional fields to cmpObject
             },
             mod: {
                 options: {
+                    config: '<%=cmp().dir %>/src/config.yml',
                     main: [
                         'scripts/mod.js',
                         'scripts/mod-views.js'
@@ -183,8 +199,11 @@ dynamically set additional fields to cmpObject
             },
             template: {
                 options: {
-                    main: 'scripts/templates.js'
+                    config: '<%=cmp().dir %>/src/config.yml',
+                    main: []
                 }
+            },
+            portal: {
             }
         },
         ...
@@ -200,16 +219,13 @@ and save as js file.
         cmpConfig: {
             app: {
                 options: {
-                    sourceFile: 'config.yml',
-                    srcField: 'src',    // get cmp().src  string
-                    pathField: 'path',  // get cmp().path  string
-
-                    set: 'config',      // set cmp().config  object
-
-                    write: { //save output javascript and yaml file
-                        jsVariable: '_<%=cmp().name %>AppConfig',  //global javascript variable for jsFile
+                    baseConfig: './config.yml',
+                    configField: 'config',
+                    pathField: 'path',
+                    write: {
+                        jsVariable: '_<%=cmp().name %>AppConfig', //global javascript variable for jsFile
                         jsFile: '<%=cmp().dest %>/scripts/app-config.js',
-                        yamlFile: '<%=cmp().dest %>/config.yml'
+                        yamlFile: '<%=cmp().dest %>/scripts/app-config.yml'
                     }
 
                 }
@@ -227,14 +243,36 @@ and stored in the field specified in the 'options.set'. (For example cmp().scrip
         cmpScripts: {
             app: {
                 options: {
-                    prefix: '/',
-                    pathField: 'path',   // get cmp().path  string
-                    scriptField: 'main', // get cmp().main  string or array
-                    minScript: false, // use min.js in scripts
-                    verParam: false, // add ?ver={cmp().version} to scripts suffix
-                    set: 'scripts'  // set cmp().scripts  array
+                    scriptField: 'main', // after get cmp().main agregate dependencies cmp.main fields as array
+                    pathField: 'path',
+                    minify: false, // use min.js in scripts
+                    version: true  // add ?ver={cmp().version} to scripts suffix
                 }
             }
         },
         ...
     }
+
+and for example use cmp fields in assemble.io
+
+        assemble: {
+            options: {
+                layoutdir: '<%=cmp(cmp().template).src %>/_layouts',
+                layout: 'default.hbs',
+                partials: '<%=cmp(cmp().template).src %>/_includes/*.hbs',
+                flatten: true,
+                hbs:{
+                    assets: '<%=cmp(cmp().template).path %>',
+                    home: '/',
+                    name: '<%=cmp().name %>App',
+                    title: '<%=cmp().config.app.title %>',
+                    scripts: function(){
+                        return cmpUtil.getCmp().main;
+                    }
+                }
+            },
+            app: {
+                src: ['<%=cmp().src %>/<%=cmp().name %>.hbs'],
+                dest: '<%=build %>'
+            }
+        },

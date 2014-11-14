@@ -505,7 +505,7 @@ module.exports = function (grunt) {
 
                 if (!lib.equalExt(script,minJsExt) && lib.equalExt(script,jsExt)) {
                     script = script.replace(new RegExp('\.js$', 'i'),minJsExt);
-                } else if (!equalExt(script,minJsExt)) {
+                } else if (!lib.equalExt(script,minJsExt)) {
                     grunt.fail.fatal('\n error ' + logField + ' item = ' + script.red + ', must end with ' + jsExt);
                 }
 
