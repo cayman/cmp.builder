@@ -12,7 +12,7 @@ module.exports = function (grunt) {
 
 
     function isRemoteDependency(depDetail){
-        return  lib.equalName(depDetail,'~') ||
+        return depDetail.indexOf(":")>=0 || lib.equalName(depDetail,'~') ||
             lib.equalName(depDetail,'>') || lib.equalName(depDetail,'=') || lib.equalName(depDetail,'<') ||
             lib.equalName(depDetail,'git') || lib.equalName(depDetail,'http') || lib.equalName(depDetail,'svn') ||
             lib.equalName(depDetail,'file');
@@ -26,61 +26,50 @@ module.exports = function (grunt) {
             grunt.fail.fatal('\n dir ' + cmpDir + 'not exist');
         }
 
-
         var options = this.options({
-            baseDependencies: { },
             sourceFile: 'cmp.json',
             bowerFile: 'bower.json',
             bowerDir: 'bower_components',
             repository: null
         });
-        if (!options.repository) {
-            grunt.log.warn('\n options.repository undefined');
-        }
-
-        var bowerConfig = {
-            cwd: cmpDir,
-            directory: options.bowerDir,
-            strictSsl: false,
-            interactive: true,
-            install: true,
-            verbose: true
-//            cleanTargetDir: false,
-//            cleanBowerDir: false,
-//            targetDir: './lib',
-//            layout: 'byType',
-//            copy: true,
-//            bowerOptions: {}
-        };
-
-        var tasks = [];
-        var dependencies = {};
-        var localDependencies = {};
-
 
         var sourceFilePath = cmpDir + '/' + options.sourceFile;
         var bowerFilePath = cmpDir + '/' + options.bowerFile;
         var isSourceFileExist = grunt.file.exists(sourceFilePath);
+        var tasks = [];
+        var dependencies = {};
+        var localDependencies = {};
+        var parentDependencies;
+
+        if (cmpDir !== '.') {
+            if (grunt.file.exists('./' + options.sourceFile)) {
+                parentDependencies = grunt.file.readJSON('./' + options.sourceFile).dependencies;
+            } else if (grunt.file.exists('./' + options.bowerFile)) {
+                parentDependencies = grunt.file.readJSON('./' + options.bowerFile).dependencies;
+            }
+        }
 
         if (isSourceFileExist) {
 
             var cmp = grunt.file.readJSON(sourceFilePath);
 
             lib.iterate(cmp.dependencies, function (depName, depDetail) {
-                if (options.baseDependencies[depName]) {
+                if (parentDependencies && parentDependencies[depName]) {
                     //override dependencies
-                    depDetail = options.baseDependencies[depName];
+                    depDetail = parentDependencies[depName];
                 }
 
                 if(isRemoteDependency(depDetail)) {
                     //is git repository
                     if (cmpUtil.isCmpName(depName)) {
+                        if (!options.repository) {
+                            grunt.log.fatal('\n options.repository undefined');
+                        }
                         dependencies[depName] = options.repository + depName + '.git#' + depDetail;
                         grunt.log.write('git cmp(' + depName + ') ' + dependencies[depName] + '\n');
                     } else {//is bower global lib
                         dependencies[depName] = depDetail;
                         grunt.log.write('bower cmp(' + depName + ') ' + dependencies[depName] + '\n');
-
                     }
 
                 }else{
@@ -121,6 +110,20 @@ module.exports = function (grunt) {
             var renderer;
             var logger;
             var command;
+            var bowerConfig = {
+                cwd: cmpDir,
+                directory: options.bowerDir,
+                strictSsl: false,
+                interactive: true,
+                install: true,
+                verbose: true
+//            cleanTargetDir: false,
+//            cleanBowerDir: false,
+//            targetDir: './lib',
+//            layout: 'byType',
+//            copy: true,
+//            bowerOptions: {}
+            };
 
             if (grunt.file.exists(cmpDir + '/' + options.bowerDir)) {
                 //update
