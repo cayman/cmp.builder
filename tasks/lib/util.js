@@ -39,6 +39,10 @@ exports.init = function (grunt) {
 
     };
 
+    lib.equalName = function (file, name) {
+        return  file.substr(0, name.length) === name;
+    };
+
     lib.equalExt = function (file, ext) {
         return  file.substr(-ext.length) === ext;
     };

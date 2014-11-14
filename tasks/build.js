@@ -10,11 +10,22 @@ module.exports = function (grunt) {
     var dirsum = require('dirsum');
     var sh = require('shorthash');
 
+
+    function isRemoteDependency(depDetail){
+        return  lib.equalName(depDetail,'~') ||
+            lib.equalName(depDetail,'>') || lib.equalName(depDetail,'=') || lib.equalName(depDetail,'<') ||
+            lib.equalName(depDetail,'git') || lib.equalName(depDetail,'http') || lib.equalName(depDetail,'svn') ||
+            lib.equalName(depDetail,'file');
+    }
+
     grunt.registerTask('cmpBower', 'cmp collect js scripts', function (dir) {
         var cmpDir = dir;
         if (!dir) {
             cmpDir = '.';
+        }else if(!grunt.file.exists(cmpDir)){
+            grunt.fail.fatal('\n dir ' + cmpDir + 'not exist');
         }
+
 
         var options = this.options({
             baseDependencies: { },
@@ -45,6 +56,8 @@ module.exports = function (grunt) {
         var tasks = [];
         var dependencies = {};
         var localDependencies = {};
+
+
         var sourceFilePath = cmpDir + '/' + options.sourceFile;
         var bowerFilePath = cmpDir + '/' + options.bowerFile;
         var isSourceFileExist = grunt.file.exists(sourceFilePath);
@@ -59,16 +72,7 @@ module.exports = function (grunt) {
                     depDetail = options.baseDependencies[depName];
                 }
 
-                if (depDetail.indexOf('.') === 0) {
-                    if (grunt.file.exists(depDetail)) {
-                        //is local folder
-                        localDependencies[depName] = depDetail;
-                        grunt.log.write('local cmp(' + depName + ') ' + localDependencies[depName] + '\n');
-                        tasks.push('cmpBower:' + depDetail);
-                    } else {
-                        grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
-                    }
-                } else {
+                if(isRemoteDependency(depDetail)) {
                     //is git repository
                     if (cmpUtil.isCmpName(depName)) {
                         dependencies[depName] = options.repository + depName + '.git#' + depDetail;
@@ -79,6 +83,16 @@ module.exports = function (grunt) {
 
                     }
 
+                }else{
+                    //is local dir
+                    if (grunt.file.exists(depDetail)) {
+                        //is local folder
+                        localDependencies[depName] = depDetail;
+                        grunt.log.write('local cmp(' + depName + ') ' + localDependencies[depName] + '\n');
+                        tasks.push('cmpBower:' + depDetail);
+                    } else {
+                        grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
+                    }
                 }
 
             });
