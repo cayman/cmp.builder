@@ -12,6 +12,7 @@ module.exports = function (grunt) {
 
 
     function isBowerDependency(depDetail){
+
         return depDetail.indexOf(":")>=0 || lib.equalName(depDetail,'~') ||
             lib.equalName(depDetail,'>') || lib.equalName(depDetail,'=') || lib.equalName(depDetail,'<') ||
             lib.equalName(depDetail,'git') || lib.equalName(depDetail,'http') || lib.equalName(depDetail,'svn') ||
