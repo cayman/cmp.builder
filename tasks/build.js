@@ -11,7 +11,7 @@ module.exports = function (grunt) {
     var sh = require('shorthash');
 
 
-    function isRemoteDependency(depDetail){
+    function isBowerDependency(depDetail){
         return depDetail.indexOf(":")>=0 || lib.equalName(depDetail,'~') ||
             lib.equalName(depDetail,'>') || lib.equalName(depDetail,'=') || lib.equalName(depDetail,'<') ||
             lib.equalName(depDetail,'git') || lib.equalName(depDetail,'http') || lib.equalName(depDetail,'svn') ||
@@ -59,7 +59,7 @@ module.exports = function (grunt) {
                     depDetail = parentDependencies[depName];
                 }
 
-                if(isRemoteDependency(depDetail)) {
+                if(isBowerDependency(depDetail)) {
                     //is git repository
                     if (cmpUtil.isCmpName(depName)) {
                         if (!options.repository) {
@@ -73,11 +73,11 @@ module.exports = function (grunt) {
                     }
 
                 }else{
-                    //is local dir
+                    //is relative local dir
                     if (grunt.file.exists(depDetail)) {
                         //is local folder
                         localDependencies[depName] = depDetail;
-                        grunt.log.write('local cmp(' + depName + ') ' + localDependencies[depName] + '\n');
+                        grunt.log.write('relative cmp(' + depName + ') ' + localDependencies[depName] + '\n');
                         tasks.push('cmpBower:' + depDetail);
                     } else {
                         grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
