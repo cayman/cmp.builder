@@ -398,17 +398,26 @@ module.exports = function (grunt) {
         var cmp = cmpUtil.getCmp(id);
 
 
-        var baseConfig = options.baseConfig;
+        //read base config object
+        var baseConfig;
         if (!options.baseConfig) {
-            grunt.fail.fatal('\n please set  ' + options.baseConfig + ' options ');
+            grunt.fail.fatal('\n please set  baseConfig options as file url or javascript object');
+        }else if(typeof options.baseConfig === "object"){
+            baseConfig = options.baseConfig;
+        }else {
+            baseConfig = readConfigFile(options.baseConfig, 'baseConfig');
         }
-        var baseConfig = readConfigFile(options.baseConfig, 'baseConfig');
 
+        //read config object
         var logField = cmp.log(options.configField);
+        var cmpConfig;
         if (!cmp[options.configField]) {
             grunt.fail.fatal('\n field ' + logField + ' is empty.\n Please set field'+ options.configField +' in cmpSet' );
+        }else if(typeof cmp[options.configField] === "object"){
+            cmpConfig = cmp[options.configField];
+        }else{
+            cmpConfig = readConfigFile(cmp[options.configField], logField);
         }
-        var cmpConfig = readConfigFile(cmp[options.configField], logField);
 
         merge.appConfigs(baseConfig, cmpConfig, cmp.name);
         grunt.log.ok(cmp.log(options.configField, [logField,'baseConfig'],'<= merge' ));
@@ -419,12 +428,14 @@ module.exports = function (grunt) {
 //                console.log('depObject.src =' + depObject.src);
 
                 var logDepCmp = depObject.log(options.configField);
-                if (!cmp[options.configField]) {
+                var depConfig;
+                if (!depObject[options.configField]) {
                     grunt.fail.fatal('\n field ' + logDepCmp + ' is empty.\n Please set field'+ options.configField +' in cmpSet' );
+                }else if(typeof depObject[options.configField] === "object"){
+                    depObject = depObject[options.configField];
+                }else{
+                    depConfig = readConfigFile(depObject[options.configField],logDepCmp);
                 }
-                var depConfig = readConfigFile(depObject[options.configField],logDepCmp);
-
-
 
                 if (depObject.type === 'mod') {
                     merge.modConfigs(baseConfig, cmpConfig, depConfig, depObject.name, depObject.version);
@@ -496,6 +507,7 @@ module.exports = function (grunt) {
         var sources = [];
 
         function parseScript(path, script, verParam) {
+
             var minJsExt = '.min.js';
             var jsExt = '.js';
             var pointIndex = script.indexOf('./');
@@ -524,11 +536,16 @@ module.exports = function (grunt) {
 
         function addCmpScripts(cmpObject) {
 
+            if(!cmpObject[options.pathField]){
+                grunt.fail.fatal('\n '+ cmpObject.log(options.pathField) + ' is empty.\n Please set field'+ options.configField +' in cmpSet task' );
+            }
+
+
             var path = cmpObject[options.pathField];
-            var scripts = cmpObject[options.scriptField];
             var verParam = options.version ? '?ver=' + cmpObject.version : '';
 
-            if(scripts) {
+            if(cmpObject[options.scriptField]) {
+                var scripts = cmpObject[options.scriptField];
                 if (scripts instanceof Array) {
                     scripts.forEach(function (script) {
                         sources.push(parseScript(path, script, verParam));
@@ -541,6 +558,8 @@ module.exports = function (grunt) {
                     }
 
                 }
+            }else{
+                grunt.log.warn(cmpObject.log(options.scriptField) + ' is empty' );
             }
         }
 
