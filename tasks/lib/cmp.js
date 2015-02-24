@@ -20,10 +20,13 @@ exports.init = function (grunt) {
         return false;
     };
 
+    cmpUtil.isCmp = function (bower) {
+        return cmpUtil.isCmpName(bower.name);
+    };
 
     cmpUtil.getSimpleId = function (bower) {
 
-        var isCmp = cmpUtil.isCmpName(bower.name);
+        var isCmp = cmpUtil.isCmp(bower);
         var type = isCmp ? isCmp[0] : 'lib';
         var name = isCmp ? isCmp[1] : bower.name;
 
@@ -66,7 +69,7 @@ exports.init = function (grunt) {
 
 
     cmpUtil.createCmp = function (id, cmpDir, bower, bowerDir) {
-        var isCmp = cmpUtil.isCmpName(bower.name);
+        var isCmp = cmpUtil.isCmp(bower);
 
         var cmp = {
             id: null,

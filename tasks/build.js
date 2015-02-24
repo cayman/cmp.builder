@@ -10,24 +10,24 @@ module.exports = function (grunt) {
     var dirsum = require('dirsum');
     var sh = require('shorthash');
 
-    function isBowerDependency(depDetail){
+    function isBowerDependency(depDetail) {
 
-        return depDetail.indexOf(":")>=0 || lib.equalName(depDetail,'~') ||
-            lib.equalName(depDetail,'>') || lib.equalName(depDetail,'=') || lib.equalName(depDetail,'<') ||
-            lib.equalName(depDetail,'git') || lib.equalName(depDetail,'http') || lib.equalName(depDetail,'svn') ||
-            lib.equalName(depDetail,'file');
+        return depDetail.indexOf(":") >= 0 || lib.equalName(depDetail, '~') ||
+            lib.equalName(depDetail, '>') || lib.equalName(depDetail, '=') || lib.equalName(depDetail, '<') ||
+            lib.equalName(depDetail, 'git') || lib.equalName(depDetail, 'http') || lib.equalName(depDetail, 'svn') ||
+            lib.equalName(depDetail, 'file');
     }
 
     grunt.registerTask('cmpBower', 'cmp collect js scripts', function (dir) {
         var cmpDir = dir;
         if (!dir) {
             cmpDir = '.';
-        }else if(!grunt.file.exists(cmpDir)){
+        } else if (!grunt.file.exists(cmpDir)) {
             grunt.fail.fatal('\n dir ' + cmpDir + 'not exist');
         }
 
         var options = this.options({
-            sourceFile: 'cmp.json',
+            sourceFile: '_bower.json',
             bowerFile: 'bower.json',
             bowerDir: 'bower_components',
             repository: null
@@ -42,6 +42,7 @@ module.exports = function (grunt) {
         var parentDependencies;
 
         if (cmpDir !== '.') {
+            grunt.log.write('Read base bower file "' + './' + options.sourceFile + '"\n');
             if (grunt.file.exists('./' + options.sourceFile)) {
                 parentDependencies = grunt.file.readJSON('./' + options.sourceFile).dependencies;
             } else if (grunt.file.exists('./' + options.bowerFile)) {
@@ -52,32 +53,36 @@ module.exports = function (grunt) {
         if (isSourceFileExist) {
 
             var cmp = grunt.file.readJSON(sourceFilePath);
+            grunt.log.write((parentDependencies? 'Override': 'Read' ) + ' preliminary bower file "' + sourceFilePath + '"\n');
 
             lib.iterate(cmp.dependencies, function (depName, depDetail) {
                 if (parentDependencies && parentDependencies[depName]) {
                     //override dependencies
                     depDetail = parentDependencies[depName];
                 }
+                grunt.log.write('   dependency'.cyan + ' "' + depName + '": ' + '"'.cyan + depDetail.cyan + '"'.cyan + '\n');
 
-                if(isBowerDependency(depDetail)) {
+                if (isBowerDependency(depDetail)) {
                     //is git repository
                     if (cmpUtil.isCmpName(depName)) {
-                        if (!options.repository) {
-                            grunt.log.fatal('\n options.repository undefined');
+                        if (options.repository) {
+                            dependencies[depName] = options.repository + depName + '.git#' + depDetail;
+                        } else {
+                            dependencies[depName] = depDetail;
                         }
-                        dependencies[depName] = options.repository + depName + '.git#' + depDetail;
-                        grunt.log.write('git cmp(' + depName + ') ' + dependencies[depName] + '\n');
+                        grunt.log.write('>> '.blue + 'is git cmp(' + depName + '): ' + dependencies[depName] + '\n');
+
                     } else {//is bower global lib
                         dependencies[depName] = depDetail;
-                        grunt.log.write('bower cmp(' + depName + ') ' + dependencies[depName] + '\n');
+                        grunt.log.write('>> '.blue + 'is bower cmp(' + depName + '): ' + dependencies[depName] + '\n');
                     }
 
-                }else{
+                } else {
                     //is relative local dir
                     if (grunt.file.exists(depDetail)) {
                         //is local folder
                         localDependencies[depName] = depDetail;
-                        grunt.log.write('relative cmp(' + depName + ') ' + localDependencies[depName] + '\n');
+                        grunt.log.write('>> '.blue + 'is relative cmp(' + depName + '): ' + localDependencies[depName] + '\n');
                         tasks.push('cmpBower:' + depDetail);
                     } else {
                         grunt.fail.fatal('\n dependency dir ' + depDetail + 'not found');
@@ -97,7 +102,8 @@ module.exports = function (grunt) {
 
             var bowerFile = JSON.stringify(cmp);
             grunt.file.write(bowerFilePath, bowerFile);
-            grunt.log.ok('File "' + bowerFilePath + '" created.');
+            grunt.log.ok('File "' + bowerFilePath + '" generated.');
+            grunt.log.write('\n');
 
         } else {
             grunt.log.warn('File ' + sourceFilePath + ' not found');
@@ -171,14 +177,14 @@ module.exports = function (grunt) {
     });
 
 
-    var _bowerFiles= {};
+    var _bowerFiles = {};
 
-    function readBowerFile(dir){
-        var file = dir+ '/bower.json';
+    function readBowerFile(dir) {
+        var file = dir + '/bower.json';
         var bower = _bowerFiles[file];
-        if(!bower) {
+        if (!bower) {
             if (!grunt.file.exists(file)) {
-                grunt.fail.fatal('\n file ' + file +' not found. Please start command "grunt cmpBower" ');
+                grunt.fail.fatal('\n file ' + file + ' not found. Please start command "grunt cmpBower" ');
             }
             _bowerFiles[file] = bower = grunt.file.readJSON(file);
         }
@@ -186,30 +192,29 @@ module.exports = function (grunt) {
     }
 
 
-
     var _componentDirs = {};
 
     function addDependency(cmp, depCmp, log) {
         cmp.dependencies.push(depCmp.id);
-        if(log) {
-            grunt.log.ok(cmp.log('dependencies[]', depCmp.id,'+='));
+        if (log) {
+            grunt.log.ok(cmp.log('dependencies[]', depCmp.id, '+='));
         }
         if (depCmp.type === 'template') {
             cmp.template = depCmp.id;
-            grunt.log.ok(cmp.log('template',depCmp.id));
+            grunt.log.ok(cmp.log('template', depCmp.id));
         }
     }
 
-    function addDependencyOrTask(tasks,cmp,depDir) {
+    function addDependencyOrTask(tasks, cmp, depDir) {
         if (_componentDirs.hasOwnProperty(depDir)) {
             addDependency(cmp, cmpUtil.getCmp(_componentDirs[depDir]));
         } else {
             var depId = cmpUtil.getSimpleId(readBowerFile(depDir));
             var depCmp;
-            if(depId && (depCmp = cmpUtil.getComponents()[depId])){
+            if (depId && (depCmp = cmpUtil.getComponents()[depId])) {
                 _componentDirs[depDir] = depId;
                 addDependency(cmp, depCmp);
-            }else{
+            } else {
                 tasks.push('cmpBuild:' + depDir + ':' + cmp.id);
             }
         }
@@ -225,10 +230,10 @@ module.exports = function (grunt) {
 
         var done = this.async();
 
-        function end(){
-            grunt.log.write('>>'.cyan + ' build dirs count',lib.fieldsCount(_componentDirs).green);
-            grunt.log.write(', bowers.json count',lib.fieldsCount(_bowerFiles).green);
-            grunt.log.writeln(', components count',lib.fieldsCount(cmpUtil.getComponents()).green);
+        function end() {
+            grunt.log.write('>>'.cyan + ' build dirs count', lib.fieldsCount(_componentDirs).green);
+            grunt.log.write(', bowers.json count', lib.fieldsCount(_bowerFiles).green);
+            grunt.log.writeln(', components count', lib.fieldsCount(cmpUtil.getComponents()).green);
             done();
         }
 
@@ -240,7 +245,7 @@ module.exports = function (grunt) {
 
 
         if (_componentDirs.hasOwnProperty(cmpDir)) {
-            grunt.verbose.writeln('\t cmp(' + _componentDirs.hasOwnProperty(cmpDir) +') already exist');
+            grunt.verbose.writeln('\t cmp(' + _componentDirs.hasOwnProperty(cmpDir) + ') already exist');
             if (parentId) {
                 addDependency(cmpUtil.getCmp(parentId), cmpUtil.getCmp(_componentDirs[cmpDir]), true);
 
@@ -255,15 +260,15 @@ module.exports = function (grunt) {
             var id = cmpUtil.getSimpleId(bower);
             var cmp;
 
-            if(id){
+            if (id) {
 
-                if(!bower.version){
+                if (!bower.version) {
                     grunt.fail.fatal('Files ' + cmpDir + '/' + options.bowerFile + ' mast have version or hashDir field');
                 }
 
                 cmp = cmpUtil.getComponents()[id];
 
-                if(!cmp) {
+                if (!cmp) {
                     cmp = cmpUtil.createCmp(id, cmpDir, bower, options.bowerDir);
 
                     var tasks = [];
@@ -279,11 +284,11 @@ module.exports = function (grunt) {
                     lib.addTasks(tasks, options[cmp.type], cmp.id);
 
                     if (tasks.length > 0) {
-                        grunt.log.ok(lib.log('subTasks[]',tasks));
+                        grunt.log.ok(lib.log('subTasks[]', tasks));
                         grunt.task.run(tasks);
                     }
 
-                    grunt.log.ok(cmp.log('dependencies',cmp.dependencies));
+                    grunt.log.ok(cmp.log('dependencies', cmp.dependencies));
 
                 }
                 if (parentId) {
@@ -294,7 +299,7 @@ module.exports = function (grunt) {
 
                 end();
 
-            }else{
+            } else {
                 dirsum.digest(cmpDir + '/' + bower.hashDir, 'md5', function (err, dirHashes) {
                     if (err) {
                         grunt.fail.fatal(err);
@@ -316,11 +321,11 @@ module.exports = function (grunt) {
                     lib.addTasks(tasks, options[cmp.type], cmp.id);
 
                     if (tasks.length > 0) {
-                        grunt.log.ok(lib.log('subTasks[]',tasks));
+                        grunt.log.ok(lib.log('subTasks[]', tasks));
                         grunt.task.run(tasks);
                     }
 
-                    grunt.log.ok(cmp.log('dependencies',cmp.dependencies));
+                    grunt.log.ok(cmp.log('dependencies', cmp.dependencies));
 
                     if (parentId) {
                         addDependency(cmpUtil.getCmp(parentId), cmp, true);
@@ -351,7 +356,7 @@ module.exports = function (grunt) {
 
         lib.iterate(options, function (fieldName, fieldValue) {
             cmp[fieldName] = fieldValue;
-            grunt.log.ok(cmp.log(fieldName,fieldValue));
+            grunt.log.ok(cmp.log(fieldName, fieldValue));
         });
 
     });
@@ -359,20 +364,20 @@ module.exports = function (grunt) {
 
     var _configFiles = {};
 
-    function readConfigFile(file,log){
+    function readConfigFile(file, log) {
         if ((typeof file) !== 'string') {
             grunt.fail.fatal('\n config file must be json or yml(yaml)');
         }
         var config = _configFiles[file];
-        if(!config) {
+        if (!config) {
             if (!grunt.file.exists(file)) {
                 grunt.fail.fatal('\n file ' + file + 'not found');
             }
             if (file.slice(-5) === '.yaml' || file.slice(-4) === '.yml') {
                 _configFiles[file] = config = grunt.file.readYAML(file);
-                grunt.log.writeln('>> '.blue + log + ' <= load from file '+ file.cyan);
+                grunt.log.writeln('>> '.blue + log + ' <= load from file ' + file.cyan);
             } else if (file.slice(-5) === '.json') {
-                grunt.log.writeln('>> '.blue + log + ' <= load from file '+ file.cyan);
+                grunt.log.writeln('>> '.blue + log + ' <= load from file ' + file.cyan);
                 _configFiles[file] = config = grunt.file.readJSON(file);
             } else {
                 grunt.fail.fatal('\n config file must be json or yml(yaml)');
@@ -402,9 +407,9 @@ module.exports = function (grunt) {
         var baseConfig;
         if (!options.baseConfig) {
             grunt.fail.fatal('\n please set  baseConfig options as file url or javascript object');
-        }else if(typeof options.baseConfig === "object"){
+        } else if (typeof options.baseConfig === "object") {
             baseConfig = options.baseConfig;
-        }else {
+        } else {
             baseConfig = readConfigFile(options.baseConfig, 'baseConfig');
         }
 
@@ -412,15 +417,15 @@ module.exports = function (grunt) {
         var logField = cmp.log(options.configField);
         var cmpConfig;
         if (!cmp[options.configField]) {
-            grunt.fail.fatal('\n field ' + logField + ' is empty.\n Please set field'+ options.configField +' in cmpSet' );
-        }else if(typeof cmp[options.configField] === "object"){
+            grunt.fail.fatal('\n field ' + logField + ' is empty.\n Please set field' + options.configField + ' in cmpSet');
+        } else if (typeof cmp[options.configField] === "object") {
             cmpConfig = cmp[options.configField];
-        }else{
+        } else {
             cmpConfig = readConfigFile(cmp[options.configField], logField);
         }
 
         merge.appConfigs(baseConfig, cmpConfig, cmp.name);
-        grunt.log.ok(cmp.log(options.configField, [logField,'baseConfig'],'<= merge' ));
+        grunt.log.ok(cmp.log(options.configField, [logField, 'baseConfig'], '<= merge'));
 
         cmp.dependencies.forEach(function (depId) {
             var depObject = cmpUtil.getCmp(depId);
@@ -430,27 +435,27 @@ module.exports = function (grunt) {
                 var logDepCmp = depObject.log(options.configField);
                 var depConfig;
                 if (!depObject[options.configField]) {
-                    grunt.fail.fatal('\n field ' + logDepCmp + ' is empty.\n Please set field'+ options.configField +' in cmpSet' );
-                }else if(typeof depObject[options.configField] === "object"){
+                    grunt.fail.fatal('\n field ' + logDepCmp + ' is empty.\n Please set field' + options.configField + ' in cmpSet');
+                } else if (typeof depObject[options.configField] === "object") {
                     depObject = depObject[options.configField];
-                }else{
-                    depConfig = readConfigFile(depObject[options.configField],logDepCmp);
+                } else {
+                    depConfig = readConfigFile(depObject[options.configField], logDepCmp);
                 }
 
                 if (depObject.type === 'mod') {
                     merge.modConfigs(baseConfig, cmpConfig, depConfig, depObject.name, depObject.version);
-                    grunt.log.ok(cmp.log(options.configField, [logField, logDepCmp],'<= merge'));
+                    grunt.log.ok(cmp.log(options.configField, [logField, logDepCmp], '<= merge'));
 
                     cmpConfig[depObject.type][depObject.name].path = depObject[options.pathField];
-                    grunt.log.ok(cmp.log(options.configField + '.' +depObject.type  + '.' + depObject.name +'.path', depObject[options.pathField]));
+                    grunt.log.ok(cmp.log(options.configField + '.' + depObject.type + '.' + depObject.name + '.path', depObject[options.pathField]));
 
-                 } else {
+                } else {
                     merge.templateConfigs(baseConfig, cmpConfig, depConfig);
-                    grunt.log.ok(cmp.log(options.configField, [logField, logDepCmp],'<= merge'));
+                    grunt.log.ok(cmp.log(options.configField, [logField, logDepCmp], '<= merge'));
 
                     cmpConfig[depObject.type].baseUrl = depObject[options.pathField];//@depricated
                     cmpConfig[depObject.type].path = depObject[options.pathField];
-                    grunt.log.ok(cmp.log(options.configField + '.' +depObject.type + '.path', depObject[options.pathField]));
+                    grunt.log.ok(cmp.log(options.configField + '.' + depObject.type + '.path', depObject[options.pathField]));
                 }
 
 
@@ -462,7 +467,7 @@ module.exports = function (grunt) {
             cmpConfig[cmp.type].path = cmp[options.pathField];
         }
         cmp[options.configField] = cmpConfig;
-        grunt.verbose.writeln('>> ' + cmp.log(options.configField,cmpConfig));
+        grunt.verbose.writeln('>> ' + cmp.log(options.configField, cmpConfig));
 
         if (options.write.jsFile) {
             var jsFile = 'var ' + options.write.jsVariable + ' = ' + JSON.stringify(cmpConfig) + ';';
@@ -480,10 +485,9 @@ module.exports = function (grunt) {
             grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.write.yamlFile.cyan);
         }
 
-        grunt.log.writeln('>>'.cyan + ' config file count',lib.fieldsCount(_configFiles).green);
+        grunt.log.writeln('>>'.cyan + ' config file count', lib.fieldsCount(_configFiles).green);
 
     });
-
 
 
     grunt.registerMultiTask('cmpScripts', 'cmp collect js scripts', function () {
@@ -515,16 +519,16 @@ module.exports = function (grunt) {
 
             if (options.minify) {
 
-                if (!lib.equalExt(script,minJsExt) && lib.equalExt(script,jsExt)) {
-                    script = script.replace(new RegExp('\.js$', 'i'),minJsExt);
-                } else if (!lib.equalExt(script,minJsExt)) {
+                if (!lib.equalExt(script, minJsExt) && lib.equalExt(script, jsExt)) {
+                    script = script.replace(new RegExp('\.js$', 'i'), minJsExt);
+                } else if (!lib.equalExt(script, minJsExt)) {
                     grunt.fail.fatal('\n error ' + logField + ' item = ' + script.red + ', must end with ' + jsExt);
                 }
 
             } else {
-                if (lib.equalExt(script,minJsExt)) {
+                if (lib.equalExt(script, minJsExt)) {
                     script = script.replace(new RegExp('\.min\.js$', 'i'), jsExt);
-                } else if (!lib.equalExt(script,jsExt)) {
+                } else if (!lib.equalExt(script, jsExt)) {
                     grunt.fail.fatal('\n  error ' + logField + ' item = ' + script.red + ', must end in ' + jsExt);
                 }
             }
@@ -536,15 +540,15 @@ module.exports = function (grunt) {
 
         function addCmpScripts(cmpObject) {
 
-            if(!cmpObject[options.pathField]){
-                grunt.fail.fatal('\n '+ cmpObject.log(options.pathField) + ' is empty.\n Please set field'+ options.configField +' in cmpSet task' );
+            if (!cmpObject[options.pathField]) {
+                grunt.fail.fatal('\n ' + cmpObject.log(options.pathField) + ' is empty.\n Please set field' + options.configField + ' in cmpSet task');
             }
 
 
             var path = cmpObject[options.pathField];
             var verParam = options.version ? '?ver=' + cmpObject.version : '';
 
-            if(cmpObject[options.scriptField]) {
+            if (cmpObject[options.scriptField]) {
                 var scripts = cmpObject[options.scriptField];
                 if (scripts instanceof Array) {
                     scripts.forEach(function (script) {
@@ -558,14 +562,14 @@ module.exports = function (grunt) {
                     }
 
                 }
-            }else{
-                grunt.log.warn(cmpObject.log(options.scriptField) + ' is empty' );
+            } else {
+                grunt.log.warn(cmpObject.log(options.scriptField) + ' is empty');
             }
         }
 
         function iterateCmpDependencies(cmpObject) {
-            if(cmpObject.dependencies && cmpObject.dependencies.length > 0) {
-                grunt.verbose.writeln('>>'.cyan + cmpObject.log('dependencies[]',cmpObject.dependencies));
+            if (cmpObject.dependencies && cmpObject.dependencies.length > 0) {
+                grunt.verbose.writeln('>>'.cyan + cmpObject.log('dependencies[]', cmpObject.dependencies));
             }
 
             cmpObject.dependencies.forEach(function (depId) {
@@ -577,8 +581,8 @@ module.exports = function (grunt) {
 
                     iterateCmpDependencies(depObject);
                     addCmpScripts(depObject);
-                }else if(dependencies[depObject.fullName] !== depObject.version){
-                    grunt.log.warn('conflict ' + depObject.fullName + ' versions:',dependencies[depObject.fullName],depObject.version);
+                } else if (dependencies[depObject.fullName] !== depObject.version) {
+                    grunt.log.warn('conflict ' + depObject.fullName + ' versions:', dependencies[depObject.fullName], depObject.version);
                 }
             });
         }

@@ -31,15 +31,14 @@ and add in taskConfig fields components as {} and cmp as cmpUtil.getCmp function
 
 ### cmpBower
 
-load cmp.json, overrade dependencies from root cmp.json and generate bower.json
+load _bower.json, overrade dependencies from root _bower.json and generate bower.json
 after load dependencies or update for bower.json
 
     var taskConfig = {
         ..
         cmpBower: {
             options: {
-                sourceFile: 'cmp.json',
-                repository: 'git+https://git.***.net:8443/git/portal/'
+                sourceFile: '_bower.json'
             }
         },
         ...
