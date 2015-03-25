@@ -1,7 +1,7 @@
 module.exports = function (grunt) {
     console.log('Grunt cmp builder lib is loaded!');
 
-    var lib = require('./lib/util').init(grunt);
+    var lib = require('./lib/lib').init(grunt);
     var cmpUtil = require('./lib/cmp').init(grunt);
     var merge = require('./lib/merge').init(grunt);
     var yaml = require('js-yaml');
@@ -9,10 +9,11 @@ module.exports = function (grunt) {
     var cli = require('bower/lib/util/cli');
     var dirsum = require('dirsum');
     var sh = require('shorthash');
+    require('events').EventEmitter.prototype._maxListeners = 100;
 
     function isBowerDependency(depDetail) {
 
-        return depDetail.indexOf(":") >= 0 || lib.equalName(depDetail, '~') ||
+        return depDetail.indexOf(":") >= 0 || lib.equalName(depDetail, '~') || lib.equalName(depDetail, '^') ||
             lib.equalName(depDetail, '>') || lib.equalName(depDetail, '=') || lib.equalName(depDetail, '<') ||
             lib.equalName(depDetail, 'git') || lib.equalName(depDetail, 'http') || lib.equalName(depDetail, 'svn') ||
             lib.equalName(depDetail, 'file');
@@ -29,8 +30,7 @@ module.exports = function (grunt) {
         var options = this.options({
             sourceFile: '_bower.json',
             bowerFile: 'bower.json',
-            bowerDir: 'bower_components',
-            repository: null
+            bowerDir: 'bower_components'
         });
 
         var sourceFilePath = cmpDir + '/' + options.sourceFile;
@@ -63,22 +63,12 @@ module.exports = function (grunt) {
                 grunt.log.write('   dependency'.cyan + ' "' + depName + '": ' + '"'.cyan + depDetail.cyan + '"'.cyan + '\n');
 
                 if (isBowerDependency(depDetail)) {
-                    //is git repository
-                    if (cmpUtil.isCmpName(depName)) {
-                        if (options.repository) {
-                            dependencies[depName] = options.repository + depName + '.git#' + depDetail;
-                        } else {
-                            dependencies[depName] = depDetail;
-                        }
-                        grunt.log.write('>> '.blue + 'is git cmp(' + depName + '): ' + dependencies[depName] + '\n');
-
-                    } else {//is bower global lib
-                        dependencies[depName] = depDetail;
-                        grunt.log.write('>> '.blue + 'is bower cmp(' + depName + '): ' + dependencies[depName] + '\n');
-                    }
+                    //is classic bower component
+                    dependencies[depName] = depDetail;
+                    grunt.log.write('>> '.blue + 'is bower cmp(' + depName + '): ' + dependencies[depName] + '\n');
 
                 } else {
-                    //is relative local dir
+                    //is relative local dir (non classic bower)
                     if (grunt.file.exists(depDetail)) {
                         //is local folder
                         localDependencies[depName] = depDetail;
@@ -491,7 +481,7 @@ module.exports = function (grunt) {
 
 
     grunt.registerMultiTask('cmpScripts', 'cmp collect js scripts', function () {
-
+        grunt.log.warn('\n cmpScripts task is deprecated. Please use function');
         var options = this.options({
             prefix: '',
             pathField: 'path',
@@ -555,7 +545,7 @@ module.exports = function (grunt) {
                         sources.push(parseScript(path, script, verParam));
                     });
                 } else {
-                    if (cmpObject.fullName === 'jquery') {
+                    if (cmpObject.name === 'jquery') {
                         sources.unshift(parseScript(path, scripts, verParam));
                     } else {
                         sources.push(parseScript(path, scripts, verParam));
@@ -575,14 +565,16 @@ module.exports = function (grunt) {
             cmpObject.dependencies.forEach(function (depId) {
 
                 var depObject = cmpUtil.getCmp(depId);
-                if (!dependencies[depObject.fullName]) {
+                var key = depObject.type + '_' + depObject.name;
+                if (!dependencies[key]) {
                     //In the script can be only one version of the library
-                    dependencies[depObject.fullName] = depObject.version;
+                    dependencies[key] = depObject.version;
 
                     iterateCmpDependencies(depObject);
                     addCmpScripts(depObject);
-                } else if (dependencies[depObject.fullName] !== depObject.version) {
-                    grunt.log.warn('conflict ' + depObject.fullName + ' versions:', dependencies[depObject.fullName], depObject.version);
+                } else if (dependencies[key] !== depObject.version) {
+                    grunt.log.warn('conflict ' + key + ' versions:',
+                        dependencies[key], '<> ' + depObject.version);
                 }
             });
         }

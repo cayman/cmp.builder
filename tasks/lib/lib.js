@@ -68,10 +68,37 @@ exports.init = function (grunt) {
         }
     };
 
-    lib.getDependenciesDir =function(cmpDir, bowerDirName){
+    lib.getDependenciesDir = function(cmpDir, bowerDirName){
         var indexInBower = cmpDir.indexOf(bowerDirName);
         var dependenciesBaseDir = (indexInBower !== -1) ? cmpDir.substring(0, indexInBower) : cmpDir + '/';
         return dependenciesBaseDir + bowerDirName;
+    };
+
+    lib.parseScript = function(script, minifyJs) {
+
+        var minJsExt = '.min.js';
+        var jsExt = '.js';
+        var pointIndex = script.indexOf('./');
+        script = (pointIndex === 0 ? script.substr(2) : script );
+
+        if (minifyJs) {
+
+            if (!lib.equalExt(script, minJsExt) && lib.equalExt(script, jsExt)) {
+                script = script.replace(new RegExp('\.js$', 'i'), minJsExt);
+            } else if (!lib.equalExt(script, minJsExt)) {
+                grunt.fail.fatal('\n error cmp().main item = ' + script.red + ', must end with ' + jsExt);
+            }
+
+        } else {
+            if (lib.equalExt(script, minJsExt)) {
+                script = script.replace(new RegExp('\.min\.js$', 'i'), jsExt);
+            } else if (!lib.equalExt(script, jsExt)) {
+                grunt.fail.fatal('\n error cmp().main item = ' + script.red + ', must end with ' + jsExt);
+            }
+        }
+
+        return script;
+
     };
 
     return lib;
