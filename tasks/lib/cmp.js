@@ -57,19 +57,38 @@ exports.init = function (grunt) {
     };
 
 
-    CmpProto.getScripts = function (prefix, pathField, mainField, minifyJs, addVersionParam) {
+    CmpProto.getScripts = function (basePath, pathField, scriptsField, minifyJs, addVersionParam) {
 
-        if (!prefix) {
-            prefix = '';
+        if (!basePath) {
+            basePath = '';
         }
         if (!pathField) {
             pathField = 'path';
         }
-        if (!mainField) {
-            mainField = 'main';
+        if (!scriptsField) {
+            scriptsField = 'main';
         }
         var dependencies = [];
         var sources = [];
+
+        //push all script into common array 'sources'
+        function pushScripts(cmpObject, scriptField, prefix, suffix){
+            if (cmpObject[scriptField]) {
+                var scripts = cmpObject[scriptField];
+                if (scripts instanceof Array) {
+                    scripts.forEach(function (script) {
+                        sources.push(prefix + lib.parseScript(script, minifyJs) + suffix);
+                    });
+                } else if(typeof scripts == 'string' || scripts instanceof String) {
+                    if (cmpObject.name === 'jquery') {
+                        sources.unshift(prefix + lib.parseScript(scripts, minifyJs) + suffix);
+                    } else {
+                        sources.push(prefix + lib.parseScript(scripts, minifyJs) + suffix);
+                    }
+
+                }
+            }
+        }
 
         function addCmpScripts(cmpObject) {
 
@@ -77,23 +96,15 @@ exports.init = function (grunt) {
                 grunt.fail.fatal('\n ' + cmpObject.log(pathField) + ' is empty.\n Please set field' + pathField + ' in cmpSet task');
             }
 
-            var path = cmpObject[pathField];
+            var path = basePath + cmpObject[pathField]+ '/';
             var verParam = addVersionParam ? '?ver=' + cmpObject.version : '';
 
-            if (cmpObject[mainField]) {
-                var scripts = cmpObject[mainField];
-                if (scripts instanceof Array) {
-                    scripts.forEach(function (script) {
-                        sources.push(prefix + path + '/' + lib.parseScript(script, minifyJs) +  verParam);
-                    });
-                } else {
-                    if (cmpObject.name === 'jquery') {
-                        sources.unshift(prefix + path + '/' + lib.parseScript(scripts, minifyJs) +  verParam);
-                    } else {
-                        sources.push(prefix + path + '/' + lib.parseScript(scripts, minifyJs) +  verParam);
-                    }
-
-                }
+            if (scriptsField instanceof Array) {
+                scriptsField.forEach(function (scriptField) {
+                   pushScripts(cmpObject, scriptField, path, verParam);
+                });
+            } else if(typeof scriptsField == 'string' || scriptsField instanceof String)  {
+                pushScripts(cmpObject, scriptsField, path, verParam);
             }
         }
 
