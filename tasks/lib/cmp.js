@@ -3,7 +3,8 @@
 exports.init = function (grunt) {
 
     var lib = require('./lib').init(grunt);
-
+    var path = require('path');
+    var url = require('url');
 
     var cmpUtil = {};
 
@@ -33,6 +34,7 @@ exports.init = function (grunt) {
 
     };
 
+    //Base class for cmp object
     var CmpProto = {
         constructor: function (id,cmpDir,bower,bowerDir) {
 
@@ -56,86 +58,142 @@ exports.init = function (grunt) {
         }
     };
 
-
-    CmpProto.getScripts = function (basePath, pathField, scriptsField, minifyJs, addVersionParam) {
-
-        if (!basePath) {
-            basePath = '';
-        }
-        if (!pathField) {
-            pathField = 'path';
-        }
-        if (!scriptsField) {
-            scriptsField = 'main';
-        }
-        var dependencies = [];
-        var sources = [];
-
-        //push all script into common array 'sources'
-        function pushScripts(cmpObject, scriptField, prefix, suffix){
-            if (cmpObject[scriptField]) {
-                var scripts = cmpObject[scriptField];
-                if (scripts instanceof Array) {
-                    scripts.forEach(function (script) {
-                        sources.push(prefix + lib.parseScript(script, minifyJs) + suffix);
-                    });
-                } else if(typeof scripts == 'string' || scripts instanceof String) {
-                    if (cmpObject.name === 'jquery') {
-                        sources.unshift(prefix + lib.parseScript(scripts, minifyJs) + suffix);
-                    } else {
-                        sources.push(prefix + lib.parseScript(scripts, minifyJs) + suffix);
+    //Base class for cmp link object
+    var CmpLink = {
+        _constructor: function (type, version, file, minFile) {
+            this.type =type;
+            this.src = file + '?ver=' + version;
+            if(minFile){
+                this.minSrc =  minFile + '?ver=' + version;
+            }
+            this.version = version;
+            return this;
+        },
+        constructorJs: function (file, version) {
+            return this._constructor('text/javascript',version,
+                lib.parseScript(file, false),lib.parseScript(file, true));
+        },
+        constructorHtml: function (file, version) {
+            return this._constructor('text/html',version,file);
+        },
+        constructorCss: function (file, version) {
+            return this._constructor('text/css',version, file).rel('stylesheet');
+        },
+        constructorIcon: function (file, version) {
+            return this._constructor('text/css',version, file);
+        },
+        rel: function(rel){
+            this.rel = rel;
+            return this;
+        },
+        params: function(params){
+            if(params){
+                for (var name in params) {
+                    if (params.hasOwnProperty(name)) {
+                        this[name] = params[name];
                     }
-
                 }
             }
+            return this;
         }
+    };
 
-        function addCmpScripts(cmpObject) {
 
+    CmpProto._parseMain = function (pathField, mainFields, callback , withDependencies) {
+        if (!mainFields) {
+            mainFields = 'main';
+        }
+        var dependencies = [];
+
+        function iterateCmpMain(cmpObject) {
             if (!cmpObject[pathField]) {
                 grunt.fail.fatal('\n ' + cmpObject.log(pathField) + ' is empty.\n Please set field' + pathField + ' in cmpSet task');
             }
 
-            var path = basePath + cmpObject[pathField]+ '/';
-            var verParam = addVersionParam ? '?ver=' + cmpObject.version : '';
-
-            if (scriptsField instanceof Array) {
-                scriptsField.forEach(function (scriptField) {
-                   pushScripts(cmpObject, scriptField, path, verParam);
-                });
-            } else if(typeof scriptsField == 'string' || scriptsField instanceof String)  {
-                pushScripts(cmpObject, scriptsField, path, verParam);
-            }
-        }
-
-        function iterateCmpDependencies(cmpObject) {
-            if (cmpObject.dependencies && cmpObject.dependencies.length > 0) {
+            if (withDependencies && cmpObject.dependencies && cmpObject.dependencies.length > 0) {
                 grunt.verbose.writeln('>>'.cyan + cmpObject.log('dependencies[]', cmpObject.dependencies));
+
+                cmpObject.dependencies.forEach(function (depId) {
+
+                    var depObject = cmpUtil.getCmp(depId);
+                    var key = depObject.type + '_' + depObject.name;
+                    if (!dependencies[key]) {
+                        //In the script can be only one version of the library
+                        dependencies[key] = depObject.version;
+
+                        iterateCmpMain(depObject);
+                    } else if (dependencies[key] !== depObject.version) {
+                        grunt.log.warn('conflict ' + key + ' versions:',
+                            dependencies[key], '<> ' + depObject.version);
+                    }
+                });
             }
 
-            cmpObject.dependencies.forEach(function (depId) {
-
-                var depObject = cmpUtil.getCmp(depId);
-                var key = depObject.type + '_' + depObject.name;
-                if (!dependencies[key]) {
-                    //In the script can be only one version of the library
-                    dependencies[key] = depObject.version;
-
-                    iterateCmpDependencies(depObject);
-                    addCmpScripts(depObject);
-                } else if (dependencies[key] !== depObject.version) {
-                    grunt.log.warn('conflict ' + key + ' versions:',
-                        dependencies[key], '<> ' + depObject.version);
-                }
+            lib.iterateDeep(cmpObject,mainFields,function(field, file){
+                callback(cmpObject,path.normalize(cmpObject[pathField]),file);
             });
         }
 
+        iterateCmpMain(this);
 
-        iterateCmpDependencies(this);
-        addCmpScripts(this);
+    };
 
-        return sources;
+    CmpProto.getScripts = function (basePath, pathField, mainFields) {
+        var scripts = [];
+        this._parseMain(pathField, mainFields, function(cmpObject, pathValue, file){
+            if(path.extname(file) === '.js'){
+                var  pathname = path.join(basePath, pathValue, path.normalize(file)).replace(/\\/g, '/');
 
+                grunt.verbose.writeln('script  pathname=', pathname);
+                if (cmpObject.name === 'jquery') {
+                    scripts.unshift(Object.create(CmpLink).constructorJs(pathname, cmpObject.version));
+                } else {
+                    scripts.push(Object.create(CmpLink).constructorJs(pathname, cmpObject.version));
+                }
+
+            }
+        },true);
+        grunt.verbose.writeln('>>'.cyan + 'scripts = ', scripts);
+        return scripts;
+    };
+
+    CmpProto.getLinks = function (basePath, pathField, mainFields) {
+        var links = [];
+        this._parseMain(pathField, mainFields,function(cmpObject, pathValue, file){
+            var parsed = url.parse(file,true);
+            var pathname = path.join(basePath, pathValue, path.normalize(parsed.pathname)).replace(/\\/g, '/');
+            grunt.verbose.writeln('link  pathname=',pathname);
+            switch (path.extname(pathname)){
+                case '.html':
+                case '.htm':
+                    links.push(Object.create(CmpLink).constructorHtml(pathname,cmpObject.version).rel('import'));
+                    break;
+                case '.css':
+                    links.push(Object.create(CmpLink).constructorCss(pathname,cmpObject.version).params(parsed.query));
+                    break;
+                case '.ico':
+                case '.icon':
+                    links.unshift(Object.create(CmpLink).constructorIcon(pathname,cmpObject.version).rel('icon'));
+                    links.unshift(Object.create(CmpLink).constructorIcon(pathname,cmpObject.version).rel('shortcut icon'));
+                    break;
+            }
+        },true);
+        grunt.verbose.writeln('>>'.cyan + 'links = ', links);
+        return links;
+    };
+
+    CmpProto.getHtml = function (basePath, pathField, mainFields) {
+        var html = [];
+        this._parseMain(pathField, mainFields, function(cmpObject, pathValue, file){
+            var ext = path.extname(file);
+            if(path.extname(file) === '.html' || path.extname(file) === '.htm'){
+                var  pathname = path.join(basePath, pathValue, path.normalize(file)).replace(/\\/g, '/');
+                grunt.verbose.writeln('html  pathname=', pathname);
+                html.push(Object.create(CmpLink).constructorHtml(pathname,cmpObject.version));
+            }
+        },false);
+        grunt.verbose.writeln('>>'.cyan + 'html = ', html);
+        return html;
     };
 
 

@@ -39,6 +39,30 @@ exports.init = function (grunt) {
 
     };
 
+    lib.iterateDeep = function (object, fields, callback) {
+        if (fields instanceof Array) {
+            fields.forEach(function (field) {
+                var values = object[field];
+                if (values instanceof Array) {
+                    values.forEach(function (value) {
+                        callback(field,value);
+                    });
+                }else if(typeof values == 'string' || values instanceof String) {
+                    callback(field,values);
+                }
+            });
+        }else if(typeof fields == 'string' || fields instanceof String) {
+            var values = object[fields];
+            if (values instanceof Array) {
+                values.forEach(function (value) {
+                    callback(fields,value);
+                });
+            }else if(typeof values == 'string' || values instanceof String) {
+                callback(fields,values);
+            }
+        }
+    };
+
     lib.equalName = function (file, name) {
         return  file.substr(0, name.length) === name;
     };
@@ -74,30 +98,34 @@ exports.init = function (grunt) {
         return dependenciesBaseDir + bowerDirName;
     };
 
-    lib.parseScript = function(script, minifyJs) {
+    //normalize file
+    lib.parseSource = function(file) {
+        return (file.indexOf('./') === 0 ? file.substr(2) : file );
+    };
+
+    //normalize script
+    lib.parseScript = function(file, minifyJs) {
 
         var minJsExt = '.min.js';
         var jsExt = '.js';
-        var pointIndex = script.indexOf('./');
-        script = (pointIndex === 0 ? script.substr(2) : script );
 
         if (minifyJs) {
 
-            if (!lib.equalExt(script, minJsExt) && lib.equalExt(script, jsExt)) {
-                script = script.replace(new RegExp('\.js$', 'i'), minJsExt);
-            } else if (!lib.equalExt(script, minJsExt)) {
-                grunt.fail.fatal('\n error cmp().main item = ' + script.red + ', must end with ' + jsExt);
+            if (!lib.equalExt(file, minJsExt) && lib.equalExt(file, jsExt)) {
+                file = file.replace(new RegExp('\.js$', 'i'), minJsExt);
+            } else if (!lib.equalExt(file, minJsExt)) {
+                grunt.fail.fatal('\n error cmp().main item = ' + file.red + ', must end with ' + jsExt);
             }
 
         } else {
-            if (lib.equalExt(script, minJsExt)) {
-                script = script.replace(new RegExp('\.min\.js$', 'i'), jsExt);
-            } else if (!lib.equalExt(script, jsExt)) {
-                grunt.fail.fatal('\n error cmp().main item = ' + script.red + ', must end with ' + jsExt);
+            if (lib.equalExt(file, minJsExt)) {
+                file = file.replace(new RegExp('\.min\.js$', 'i'), jsExt);
+            } else if (!lib.equalExt(file, jsExt)) {
+                grunt.fail.fatal('\n error cmp().main item = ' + file.red + ', must end with ' + jsExt);
             }
         }
 
-        return script;
+        return file;
 
     };
 
