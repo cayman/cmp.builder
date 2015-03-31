@@ -80,13 +80,16 @@ exports.init = function (grunt) {
     };
 
     lib.addTasks = function(tasks,options,param){
-        if(options && options.tasks){
+
+        //option options.tasks is depricated
+        if(options && options.tasks ){
             //add tasks
+            grunt.verbose.writeln('>>'.cyan + ' tasks', options.tasks);
             if(options.tasks instanceof Array ){
                 options.tasks.forEach(function (task) {
                     tasks.push(task + ':' + param);
                 });
-            }else {
+            }else if(typeof options.tasks == 'string' || options.tasks instanceof String){
                 tasks.push(options.tasks + ':' + param);
             }
         }

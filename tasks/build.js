@@ -24,7 +24,7 @@ module.exports = function (grunt) {
         if (!dir) {
             cmpDir = '.';
         } else if (!grunt.file.exists(cmpDir)) {
-            grunt.fail.fatal('\n dir ' + cmpDir + 'not exist');
+            grunt.fail.fatal('\n dir \'' + cmpDir + '\' not exist');
         }
 
         var options = this.options({
@@ -171,6 +171,7 @@ module.exports = function (grunt) {
 
     function readBowerFile(dir) {
         var file = dir + '/bower.json';
+        grunt.log.writeln('   read file', file);
         var bower = _bowerFiles[file];
         if (!bower) {
             if (!grunt.file.exists(file)) {
@@ -195,7 +196,7 @@ module.exports = function (grunt) {
         }
     }
 
-    function addDependencyOrTask(tasks, cmp, depDir) {
+    function addDependencyOrTask(currentTask, tasks, cmp, depDir) {
         if (_componentDirs.hasOwnProperty(depDir)) {
             addDependency(cmp, cmpUtil.getCmp(_componentDirs[depDir]));
         } else {
@@ -205,32 +206,33 @@ module.exports = function (grunt) {
                 _componentDirs[depDir] = depId;
                 addDependency(cmp, depCmp);
             } else {
-                tasks.push('cmpBuild:' + depDir + ':' + cmp.id);
+                tasks.push(currentTask + ':' + depDir + ':' + cmp.id);
             }
         }
     }
 
 
-    grunt.registerTask('cmpBuild', 'component init task', function (dir, parentId) {
+    grunt.registerMultiTask('cmpBuild', 'component init task', function () {
         // Merge task-specific and/or target-specific options with these defaults.
+        var done = this.async();
+
         var options = this.options({
             bowerDir: 'bower_components'
         });
+        var currentTask = this.name +':' + this.target;
+        grunt.verbose.writeln('>>'.red + 'task', currentTask);
 
+        var cmpDir = this.args[0] || '.', parentId = this.args[1];
+        grunt.verbose.writeln('>>'.red + 'cmpDir', cmpDir);
+        grunt.verbose.writeln('>>'.red + 'parentId', parentId);
 
-        var done = this.async();
+        //grunt.log.write('>>'.red + 'this.data', this.data);
 
         function end() {
             grunt.log.write('>>'.cyan + ' build dirs count', lib.fieldsCount(_componentDirs).green);
             grunt.log.write(', bowers.json count', lib.fieldsCount(_bowerFiles).green);
             grunt.log.writeln(', components count', lib.fieldsCount(cmpUtil.getComponents()).green);
             done();
-        }
-
-        var cmpDir = dir;
-
-        if (!dir) {  //default dir
-            cmpDir = '.';
         }
 
 
@@ -264,11 +266,11 @@ module.exports = function (grunt) {
                     var tasks = [];
 
                     lib.iterate(bower.dependencies, function (depName, depDetail) {
-                        addDependencyOrTask(tasks, cmp, cmp.dependenciesDir + '/' + depName)
+                        addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                     });
 
                     lib.iterate(bower.localDependencies, function (depName, depDetail) {
-                        addDependencyOrTask(tasks, cmp, depDetail);
+                        addDependencyOrTask(currentTask, tasks, cmp, depDetail);
                     });
 
                     lib.addTasks(tasks, options[cmp.type], cmp.id);
@@ -301,11 +303,11 @@ module.exports = function (grunt) {
                     var tasks = [];
 
                     lib.iterate(bower.dependencies, function (depName, depDetail) {
-                        addDependencyOrTask(tasks, cmp, cmp.dependenciesDir + '/' + depName)
+                        addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                     });
 
                     lib.iterate(bower.localDependencies, function (depName, depDetail) {
-                        addDependencyOrTask(tasks, cmp, depDetail);
+                        addDependencyOrTask(currentTask, tasks, cmp, depDetail);
                     });
 
                     lib.addTasks(tasks, options[cmp.type], cmp.id);
@@ -479,9 +481,11 @@ module.exports = function (grunt) {
 
     });
 
-
+    /**
+     * deprecated
+     */
     grunt.registerMultiTask('cmpScripts', 'cmp collect js scripts', function () {
-        grunt.log.warn('\n cmpScripts task is deprecated. Please use function');
+        grunt.log.warn('\n cmpScripts task is deprecated. Please use function cmp().getScripts');
         var options = this.options({
             prefix: '',
             pathField: 'path',

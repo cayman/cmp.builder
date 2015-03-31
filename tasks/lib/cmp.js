@@ -60,18 +60,14 @@ exports.init = function (grunt) {
 
     //Base class for cmp link object
     var CmpLink = {
-        _constructor: function (type, version, file, minFile) {
+        _constructor: function (type, version, file) {
             this.type =type;
             this.src = file + '?ver=' + version;
-            if(minFile){
-                this.minSrc =  minFile + '?ver=' + version;
-            }
             this.version = version;
             return this;
         },
-        constructorJs: function (file, version) {
-            return this._constructor('text/javascript',version,
-                lib.parseScript(file, false),lib.parseScript(file, true));
+        constructorJs: function (file, version, mininify) {
+            return this._constructor('text/javascript',version,lib.parseScript(file, mininify));
         },
         constructorHtml: function (file, version) {
             return this._constructor('text/html',version,file);
@@ -138,27 +134,30 @@ exports.init = function (grunt) {
 
     };
 
-    CmpProto.getScripts = function (basePath, pathField, mainFields) {
+    CmpProto.getScripts = function (basePath, pathField, mainFields,minJs) {
         var scripts = [];
+        grunt.log.writeln('>>'.red + ' getScripts(\'' + basePath + '\',\'' + pathField + '\',\'' + mainFields + '\',' + minJs + ')');
         this._parseMain(pathField, mainFields, function(cmpObject, pathValue, file){
             if(path.extname(file) === '.js'){
                 var  pathname = path.join(basePath, pathValue, path.normalize(file)).replace(/\\/g, '/');
 
                 grunt.verbose.writeln('script  pathname=', pathname);
                 if (cmpObject.name === 'jquery') {
-                    scripts.unshift(Object.create(CmpLink).constructorJs(pathname, cmpObject.version));
+                    scripts.unshift(Object.create(CmpLink).constructorJs(pathname, cmpObject.version, minJs));
                 } else {
-                    scripts.push(Object.create(CmpLink).constructorJs(pathname, cmpObject.version));
+                    scripts.push(Object.create(CmpLink).constructorJs(pathname, cmpObject.version, minJs));
                 }
 
             }
         },true);
+        //grunt.log.writeln('>>'.cyan + 'scripts = ', scripts);
         grunt.verbose.writeln('>>'.cyan + 'scripts = ', scripts);
         return scripts;
     };
 
     CmpProto.getLinks = function (basePath, pathField, mainFields) {
         var links = [];
+        grunt.log.writeln('>>'.red + ' getLinks(\'' + basePath  + '\',\'' +  pathField  + '\',\'' +  mainFields + '\')');
         this._parseMain(pathField, mainFields,function(cmpObject, pathValue, file){
             var parsed = url.parse(file,true);
             var pathname = path.join(basePath, pathValue, path.normalize(parsed.pathname)).replace(/\\/g, '/');
@@ -178,6 +177,7 @@ exports.init = function (grunt) {
                     break;
             }
         },true);
+        //grunt.log.writeln('>>'.cyan + 'links = ', links);
         grunt.verbose.writeln('>>'.cyan + 'links = ', links);
         return links;
     };
