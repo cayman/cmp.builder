@@ -1,10 +1,10 @@
 'use strict';
+var path = require('path');
+var url = require('url');
 
 exports.init = function (grunt) {
 
     var lib = require('./lib').init(grunt);
-    var path = require('path');
-    var url = require('url');
 
     var cmpUtil = {};
 
@@ -60,23 +60,24 @@ exports.init = function (grunt) {
 
     //Base class for cmp link object
     var CmpLink = {
-        _constructor: function (type, version, file) {
+        _constructor: function (type, file, version) {
             this.type =type;
             this.src = file + '?ver=' + version;
+            this.path = file;
             this.version = version;
             return this;
         },
-        constructorJs: function (file, version, mininify) {
-            return this._constructor('text/javascript',version,lib.parseScript(file, mininify));
+        constructorJs: function (file, version) {
+            return this._constructor('text/javascript',file,version);
         },
         constructorHtml: function (file, version) {
-            return this._constructor('text/html',version,file);
+            return this._constructor('text/html',file,version);
         },
         constructorCss: function (file, version) {
-            return this._constructor('text/css',version, file).rel('stylesheet');
+            return this._constructor('text/css',file,version).rel('stylesheet');
         },
         constructorIcon: function (file, version) {
-            return this._constructor('text/css',version, file);
+            return this._constructor('text/css',file,version);
         },
         rel: function(rel){
             this.rel = rel;
@@ -95,9 +96,9 @@ exports.init = function (grunt) {
     };
 
 
-    CmpProto._parseMain = function (pathField, mainFields, callback , withDependencies) {
-        if (!mainFields) {
-            mainFields = 'main';
+    CmpProto._parseMain = function (pathField, fileFields, callback , withDependencies) {
+        if (!fileFields) {
+            fileFields = 'main';
         }
         var dependencies = [];
 
@@ -125,7 +126,7 @@ exports.init = function (grunt) {
                 });
             }
 
-            lib.iterateDeep(cmpObject,mainFields,function(field, file){
+            lib.iterateDeep(cmpObject,fileFields,function(field, file){
                 callback(cmpObject,path.normalize(cmpObject[pathField]),file);
             });
         }
@@ -134,18 +135,17 @@ exports.init = function (grunt) {
 
     };
 
-    CmpProto.getScripts = function (basePath, pathField, mainFields,minJs) {
+    CmpProto.getScripts = function (basePath, pathField, fileFields, minJs) {
         var scripts = [];
-        grunt.log.writeln('>>'.red + ' getScripts(\'' + basePath + '\',\'' + pathField + '\',\'' + mainFields + '\',' + minJs + ')');
-        this._parseMain(pathField, mainFields, function(cmpObject, pathValue, file){
-            if(path.extname(file) === '.js'){
-                var  pathname = path.join(basePath, pathValue, path.normalize(file)).replace(/\\/g, '/');
-
+        grunt.log.writeln('>>'.red + ' getScripts(\'' + basePath + '\',\'' + pathField + '\',\'' + fileFields + '\',' + minJs + ')');
+        this._parseMain(pathField, fileFields, function(cmpObject, pathValue, fileValue){
+            if(path.extname(fileValue) === '.js'){
+                var  pathname = lib.pathJoin(basePath, pathValue, fileValue);
                 grunt.verbose.writeln('script  pathname=', pathname);
                 if (cmpObject.name === 'jquery') {
-                    scripts.unshift(Object.create(CmpLink).constructorJs(pathname, cmpObject.version, minJs));
+                    scripts.unshift(Object.create(CmpLink).constructorJs(lib.parseScript(pathname, minJs), cmpObject.version));
                 } else {
-                    scripts.push(Object.create(CmpLink).constructorJs(pathname, cmpObject.version, minJs));
+                    scripts.push(Object.create(CmpLink).constructorJs(lib.parseScript(pathname, minJs), cmpObject.version));
                 }
 
             }
@@ -155,12 +155,21 @@ exports.init = function (grunt) {
         return scripts;
     };
 
-    CmpProto.getLinks = function (basePath, pathField, mainFields) {
+    CmpProto.getArrayScripts = function (basePath, pathField, fileFields, minJs) {
+       var scripts = this.getScripts(basePath, pathField, fileFields, minJs);
+       var arr = [];
+       for(var key in scripts) {
+           arr.push(scripts[key].path);
+       }
+       return arr;
+    };
+
+    CmpProto.getLinks = function (basePath, pathField, fileFields) {
         var links = [];
-        grunt.log.writeln('>>'.red + ' getLinks(\'' + basePath  + '\',\'' +  pathField  + '\',\'' +  mainFields + '\')');
-        this._parseMain(pathField, mainFields,function(cmpObject, pathValue, file){
-            var parsed = url.parse(file,true);
-            var pathname = path.join(basePath, pathValue, path.normalize(parsed.pathname)).replace(/\\/g, '/');
+        grunt.log.writeln('>>'.red + ' getLinks(\'' + basePath  + '\',\'' +  pathField  + '\',\'' +  fileFields + '\')');
+        this._parseMain(pathField, fileFields,function(cmpObject, pathValue, fileValue){
+            var parsed = url.parse(fileValue,true);
+            var pathname = lib.pathJoin(basePath, pathValue, parsed.pathname);
             grunt.verbose.writeln('link  pathname=',pathname);
             switch (path.extname(pathname)){
                 case '.html':
@@ -182,12 +191,12 @@ exports.init = function (grunt) {
         return links;
     };
 
-    CmpProto.getHtml = function (basePath, pathField, mainFields) {
+    CmpProto.getHtml = function (basePath, pathField, fileFields) {
         var html = [];
-        this._parseMain(pathField, mainFields, function(cmpObject, pathValue, file){
-            var ext = path.extname(file);
-            if(path.extname(file) === '.html' || path.extname(file) === '.htm'){
-                var  pathname = path.join(basePath, pathValue, path.normalize(file)).replace(/\\/g, '/');
+        this._parseMain(pathField, fileFields, function(cmpObject, pathValue, fileValue){
+            var ext = path.extname(fileValue);
+            if(ext === '.html' || ext === '.htm'){
+                var  pathname = lib.pathJoin(basePath, pathValue, fileValue);
                 grunt.verbose.writeln('html  pathname=', pathname);
                 html.push(Object.create(CmpLink).constructorHtml(pathname,cmpObject.version));
             }

@@ -1,15 +1,26 @@
+'use strict';
+var yaml = require('js-yaml');
+var bower = require('bower');
+var cli = require('bower/lib/util/cli');
+var dirsum = require('dirsum');
+var sh = require('shorthash');
+
+var runner = require('karma').runner;
+var server = require('karma').server;
+var path = require('path');
+var _ = require('lodash');
+
+require('events').EventEmitter.prototype._maxListeners = 100;
+
 module.exports = function (grunt) {
     console.log('Grunt cmp builder lib is loaded!');
 
     var lib = require('./lib/lib').init(grunt);
     var cmpUtil = require('./lib/cmp').init(grunt);
     var merge = require('./lib/merge').init(grunt);
-    var yaml = require('js-yaml');
-    var bower = require('bower');
-    var cli = require('bower/lib/util/cli');
-    var dirsum = require('dirsum');
-    var sh = require('shorthash');
-    require('events').EventEmitter.prototype._maxListeners = 100;
+
+
+
 
     function isBowerDependency(depDetail) {
 
@@ -167,22 +178,6 @@ module.exports = function (grunt) {
     });
 
 
-    var _bowerFiles = {};
-
-    function readBowerFile(dir) {
-        var file = dir + '/bower.json';
-        grunt.log.writeln('   read file', file);
-        var bower = _bowerFiles[file];
-        if (!bower) {
-            if (!grunt.file.exists(file)) {
-                grunt.fail.fatal('\n file ' + file + ' not found. Please start command "grunt cmpBower" ');
-            }
-            _bowerFiles[file] = bower = grunt.file.readJSON(file);
-        }
-        return bower;
-    }
-
-
     var _componentDirs = {};
 
     function addDependency(cmp, depCmp, log) {
@@ -200,7 +195,7 @@ module.exports = function (grunt) {
         if (_componentDirs.hasOwnProperty(depDir)) {
             addDependency(cmp, cmpUtil.getCmp(_componentDirs[depDir]));
         } else {
-            var depId = cmpUtil.getSimpleId(readBowerFile(depDir));
+            var depId = cmpUtil.getSimpleId(lib.readBowerFile(depDir));
             var depCmp;
             if (depId && (depCmp = cmpUtil.getComponents()[depId])) {
                 _componentDirs[depDir] = depId;
@@ -230,7 +225,7 @@ module.exports = function (grunt) {
 
         function end() {
             grunt.log.write('>>'.cyan + ' build dirs count', lib.fieldsCount(_componentDirs).green);
-            grunt.log.write(', bowers.json count', lib.fieldsCount(_bowerFiles).green);
+            grunt.log.write(', bowers.json count', lib.fieldsCount(lib._bowerFiles).green);
             grunt.log.writeln(', components count', lib.fieldsCount(cmpUtil.getComponents()).green);
             done();
         }
@@ -246,7 +241,7 @@ module.exports = function (grunt) {
 
         } else {
             //load bower file
-            var bower = readBowerFile(cmpDir);
+            var bower = lib.readBowerFile(cmpDir);
 
             //is Cmp component object
             var id = cmpUtil.getSimpleId(bower);
@@ -354,29 +349,6 @@ module.exports = function (grunt) {
     });
 
 
-    var _configFiles = {};
-
-    function readConfigFile(file, log) {
-        if ((typeof file) !== 'string') {
-            grunt.fail.fatal('\n config file must be json or yml(yaml)');
-        }
-        var config = _configFiles[file];
-        if (!config) {
-            if (!grunt.file.exists(file)) {
-                grunt.fail.fatal('\n file ' + file + 'not found');
-            }
-            if (file.slice(-5) === '.yaml' || file.slice(-4) === '.yml') {
-                _configFiles[file] = config = grunt.file.readYAML(file);
-                grunt.log.writeln('>> '.blue + log + ' <= load from file ' + file.cyan);
-            } else if (file.slice(-5) === '.json') {
-                grunt.log.writeln('>> '.blue + log + ' <= load from file ' + file.cyan);
-                _configFiles[file] = config = grunt.file.readJSON(file);
-            } else {
-                grunt.fail.fatal('\n config file must be json or yml(yaml)');
-            }
-        }
-        return config;
-    }
 
     grunt.registerMultiTask('cmpConfig', 'cmp save confg', function () {
 
@@ -402,7 +374,7 @@ module.exports = function (grunt) {
         } else if (typeof options.baseConfig === "object") {
             baseConfig = options.baseConfig;
         } else {
-            baseConfig = readConfigFile(options.baseConfig, 'baseConfig');
+            baseConfig = lib.readConfigFile(options.baseConfig, 'baseConfig');
         }
 
         //read config object
@@ -413,7 +385,7 @@ module.exports = function (grunt) {
         } else if (typeof cmp[options.configField] === "object") {
             cmpConfig = cmp[options.configField];
         } else {
-            cmpConfig = readConfigFile(cmp[options.configField], logField);
+            cmpConfig = lib.readConfigFile(cmp[options.configField], logField);
         }
 
         merge.appConfigs(baseConfig, cmpConfig, cmp.name);
@@ -431,7 +403,7 @@ module.exports = function (grunt) {
                 } else if (typeof depObject[options.configField] === "object") {
                     depObject = depObject[options.configField];
                 } else {
-                    depConfig = readConfigFile(depObject[options.configField], logDepCmp);
+                    depConfig = lib.readConfigFile(depObject[options.configField], logDepCmp);
                 }
 
                 if (depObject.type === 'mod') {
@@ -477,7 +449,7 @@ module.exports = function (grunt) {
             grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.write.yamlFile.cyan);
         }
 
-        grunt.log.writeln('>>'.cyan + ' config file count', lib.fieldsCount(_configFiles).green);
+        grunt.log.writeln('>>'.cyan + ' config file count', lib.fieldsCount(lib._configFiles).green);
 
     });
 
@@ -592,6 +564,134 @@ module.exports = function (grunt) {
 
 //        grunt.verbose.writeln('>> '.cyan + cmp.log(options.scriptField ,sources));
 
+    });
+
+
+    function finished(code){
+        return this(code === 0);
+    }
+
+
+
+
+
+    grunt.registerMultiTask('cmpKarma', 'run karma.', function() {
+        var done = this.async();
+        var options = this.options({
+            background: false,
+            client: {}
+        });
+
+        // Allow for passing cli arguments to `client.args` using  `--grep=x`
+        var args = _.filter(process.argv.slice(2), function(arg) {
+            return arg.match(/^--?/);
+        });
+        //grunt.log.writeln('  args:',args);
+
+        if (_.isArray(options.client.args)) {
+            options.client.args = options.client.args.concat(args);
+        } else {
+            options.client.args = args;
+        }
+
+        // Merge karma default options
+        _.defaults(options.client, {
+            args: [],
+            useIframe: true,
+            captureConsole: true
+        });
+
+        var opts = _.cloneDeep(options);
+        // Merge options onto data, with data taking precedence.
+        var data = _.merge(opts, this.data);
+
+        // But override the browsers array.
+        if (data.browsers && this.data.browsers) {
+            data.browsers = this.data.browsers;
+        }
+
+        // Merge client.args
+        if (this.data.client && _.isArray(this.data.client.args)) {
+            data.client.args = this.data.client.args.concat(options.client.args);
+        }
+
+
+        if (data.configFile) {
+            data.configFile = path.resolve(data.configFile);
+        }
+
+
+        var files = [];
+
+        if (data.files) {
+            data.files.map(function(file){
+                if(lib.isString(file)){
+                    files = files.concat(file.split(',').map(function(src){
+                        return {
+                            pattern: src
+                        };
+                    }));
+
+                }else if(file.pattern){
+                    files = files.concat(file.pattern.split(',').map(function(src){
+                        var obj = {
+                            pattern: src
+                        };
+                        ['watched', 'served', 'included'].forEach(function(opt) {
+                            if (opt in file) {
+                                obj[opt] = file[opt];
+                            }
+                        });
+                        return obj;
+                    }));
+                }
+
+            });
+
+        }
+        data.files = files;
+        grunt.verbose.writeln('>> data:',data);
+
+        // Allow the use of templates in preprocessors
+        if (_.isPlainObject(data.preprocessors)) {
+            var preprocessors = {};
+            Object.keys(data.preprocessors).forEach(function(key) {
+                var value = data.preprocessors[key];
+                key = path.resolve(key);
+                key = grunt.template.process(key);
+                preprocessors[key] = value;
+            });
+            data.preprocessors = preprocessors;
+        }
+
+        //support `karma run`, useful for grunt watch
+        if (this.flags.run){
+            runner.run(data, finished.bind(done));
+            return;
+        }
+
+        //allow karma to be run in the background so it doesn't block grunt
+        if (data.background){
+            var backgroundArgs = {
+                cmd: 'node',
+                args: process.execArgv.concat([
+                    path.join(__dirname, '..', 'lib', 'background.js'),
+                    JSON.stringify(data)
+                ])
+            };
+            var backgroundProcess = grunt.util.spawn(backgroundArgs, function(error) {
+                if (error) {
+                    grunt.log.error(error);
+                }
+            });
+            process.on('exit', function() {
+                backgroundProcess.kill();
+            });
+
+            done();
+        } else {
+            server.start(data, finished.bind(done));
+        }
     });
 
 

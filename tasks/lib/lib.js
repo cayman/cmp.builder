@@ -1,15 +1,21 @@
 'use strict';
+var path = require('path');
 
 exports.init = function (grunt) {
 
 
+
     var lib = {};
+
+    lib.isString = function(value){
+        return typeof value == 'string' || value instanceof String;
+    };
 
     lib.log = function(field, value, prefix){
         var assign = prefix ? ' ' + prefix + ' ' : ' = ';
         if (!value) {
             return prefix ? field + assign : field;
-        } else if (typeof value === 'string') {
+        } else if (lib.isString(value)) {
             return field + assign + value.cyan;
         } else if (value instanceof Array) {
 //            if(value.length < 15 || value.length > 40 ){
@@ -47,17 +53,17 @@ exports.init = function (grunt) {
                     values.forEach(function (value) {
                         callback(field,value);
                     });
-                }else if(typeof values == 'string' || values instanceof String) {
+                }else if(lib.isString(values == 'string')) {
                     callback(field,values);
                 }
             });
-        }else if(typeof fields == 'string' || fields instanceof String) {
+        }else if(lib.isString(fields)) {
             var values = object[fields];
             if (values instanceof Array) {
                 values.forEach(function (value) {
                     callback(fields,value);
                 });
-            }else if(typeof values == 'string' || values instanceof String) {
+            }else if(lib.isString(values)) {
                 callback(fields,values);
             }
         }
@@ -89,7 +95,7 @@ exports.init = function (grunt) {
                 options.tasks.forEach(function (task) {
                     tasks.push(task + ':' + param);
                 });
-            }else if(typeof options.tasks == 'string' || options.tasks instanceof String){
+            }else if(lib.isString(options.tasks)){
                 tasks.push(options.tasks + ':' + param);
             }
         }
@@ -102,8 +108,8 @@ exports.init = function (grunt) {
     };
 
     //normalize file
-    lib.parseSource = function(file) {
-        return (file.indexOf('./') === 0 ? file.substr(2) : file );
+    lib.pathJoin = function(basePath, pathValue, file) {
+        return path.join(basePath, pathValue, path.normalize(file)).replace(/\\/g, '/');
     };
 
     //normalize script
@@ -117,19 +123,82 @@ exports.init = function (grunt) {
             if (!lib.equalExt(file, minJsExt) && lib.equalExt(file, jsExt)) {
                 file = file.replace(new RegExp('\.js$', 'i'), minJsExt);
             } else if (!lib.equalExt(file, minJsExt)) {
-                grunt.fail.fatal('\n error cmp().main item = ' + file.red + ', must end with ' + jsExt);
+                grunt.fail.fatal('\n error parse Script file = ' + file.red + ', must end with ' + jsExt);
             }
 
         } else {
             if (lib.equalExt(file, minJsExt)) {
                 file = file.replace(new RegExp('\.min\.js$', 'i'), jsExt);
             } else if (!lib.equalExt(file, jsExt)) {
-                grunt.fail.fatal('\n error cmp().main item = ' + file.red + ', must end with ' + jsExt);
+                grunt.fail.fatal('\n error parse Script file = ' + file.red + ', must end with ' + jsExt);
             }
         }
 
         return file;
 
+    };
+
+    lib._bowerFiles = {};
+
+    lib.readBowerFile = function(dir) {
+        var file = dir + '/bower.json';
+        grunt.log.writeln('   read file', file);
+        var bower = lib._bowerFiles[file];
+        if (!bower) {
+            if (!grunt.file.exists(file)) {
+                grunt.fail.fatal('\n file ' + file + ' not found. Please start command "grunt cmpBower" ');
+            }
+            lib._bowerFiles[file] = bower = grunt.file.readJSON(file);
+        }
+        return bower;
+    };
+
+    lib._configFiles = {};
+
+    lib.readConfigFile= function(file, log) {
+        if ((typeof file) !== 'string') {
+            grunt.fail.fatal('\n config file must be json or yml(yaml)');
+        }
+        var config = lib._configFiles[file];
+        if (!config) {
+            if (!grunt.file.exists(file)) {
+                grunt.fail.fatal('\n file ' + file + 'not found');
+            }
+            if (file.slice(-5) === '.yaml' || file.slice(-4) === '.yml') {
+                lib._configFiles[file] = config = grunt.file.readYAML(file);
+                grunt.log.writeln('>> '.blue + log + ' <= load from file ' + file.cyan);
+            } else if (file.slice(-5) === '.json') {
+                lib._configFiles[file] = config = grunt.file.readJSON(file);
+                grunt.log.writeln('>> '.blue + log + ' <= load from file ' + file.cyan);
+            } else {
+                grunt.fail.fatal('\n config file must be json or yml(yaml)');
+            }
+        }
+        return config;
+    };
+
+    lib.karmaSrc = function (file) {
+        return file.split(',').map(function(src){
+            var obj = {
+                pattern: src
+            };
+            grunt.log.ok('file:',obj);
+            return obj;
+        });
+    };
+    lib.karmaPattern = function (file) {
+        return file.pattern.split(',').map(function(src){
+            var obj = {
+                pattern: src
+            };
+            ['watched', 'served', 'included'].forEach(function(opt) {
+                if (opt in options) {
+                    obj[opt] = options[opt];
+                }
+            });
+            grunt.log.ok('file:',obj);
+            return obj;
+        });
     };
 
     return lib;
