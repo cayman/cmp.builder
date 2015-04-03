@@ -5,30 +5,14 @@ var cli = require('bower/lib/util/cli');
 var dirsum = require('dirsum');
 var sh = require('shorthash');
 
-var runner = require('karma').runner;
-var server = require('karma').server;
-var path = require('path');
-var _ = require('lodash');
-
 require('events').EventEmitter.prototype._maxListeners = 100;
 
 module.exports = function (grunt) {
     console.log('Grunt cmp builder lib is loaded!');
 
-    var lib = require('./lib/lib').init(grunt);
-    var cmpUtil = require('./lib/cmp').init(grunt);
-    var merge = require('./lib/merge').init(grunt);
-
-
-
-
-    function isBowerDependency(depDetail) {
-
-        return depDetail.indexOf(":") >= 0 || lib.equalName(depDetail, '~') || lib.equalName(depDetail, '^') ||
-            lib.equalName(depDetail, '>') || lib.equalName(depDetail, '=') || lib.equalName(depDetail, '<') ||
-            lib.equalName(depDetail, 'git') || lib.equalName(depDetail, 'http') || lib.equalName(depDetail, 'svn') ||
-            lib.equalName(depDetail, 'file');
-    }
+    var lib = require('../lib/lib').init(grunt);
+    var cmpUtil = require('../lib/cmp').init(grunt);
+    var merge = require('../lib/merge').init(grunt);
 
     grunt.registerTask('cmpBower', 'cmp collect js scripts', function (dir) {
         var cmpDir = dir;
@@ -73,7 +57,7 @@ module.exports = function (grunt) {
                 }
                 grunt.log.write('   dependency'.cyan + ' "' + depName + '": ' + '"'.cyan + depDetail.cyan + '"'.cyan + '\n');
 
-                if (isBowerDependency(depDetail)) {
+                if (lib.isBowerDependency(depDetail)) {
                     //is classic bower component
                     dependencies[depName] = depDetail;
                     grunt.log.write('>> '.blue + 'is bower cmp(' + depName + '): ' + dependencies[depName] + '\n');
@@ -215,6 +199,7 @@ module.exports = function (grunt) {
             bowerDir: 'bower_components'
         });
         var currentTask = this.name +':' + this.target;
+        var currentTarget = this.target;
         grunt.verbose.writeln('>>'.red + 'task', currentTask);
 
         var cmpDir = this.args[0] || '.', parentId = this.args[1];
@@ -264,9 +249,16 @@ module.exports = function (grunt) {
                         addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                     });
 
+                    if (currentTarget === 'test' && cmp.type === 'app'){
+                        lib.iterate(bower.devDependencies, function (depName, depDetail) {
+                            addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
+                        });
+                    }
+
                     lib.iterate(bower.localDependencies, function (depName, depDetail) {
                         addDependencyOrTask(currentTask, tasks, cmp, depDetail);
                     });
+
 
                     lib.addTasks(tasks, options[cmp.type], cmp.id);
 
@@ -301,9 +293,17 @@ module.exports = function (grunt) {
                         addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                     });
 
+                    if (currentTarget === 'test' && cmp.type === 'app'){
+                        lib.iterate(bower.devDependencies, function (depName, depDetail) {
+                            addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
+                        });
+                    }
+
                     lib.iterate(bower.localDependencies, function (depName, depDetail) {
                         addDependencyOrTask(currentTask, tasks, cmp, depDetail);
                     });
+
+
 
                     lib.addTasks(tasks, options[cmp.type], cmp.id);
 
@@ -451,247 +451,6 @@ module.exports = function (grunt) {
 
         grunt.log.writeln('>>'.cyan + ' config file count', lib.fieldsCount(lib._configFiles).green);
 
-    });
-
-    /**
-     * deprecated
-     */
-    grunt.registerMultiTask('cmpScripts', 'cmp collect js scripts', function () {
-        grunt.log.warn('\n cmpScripts task is deprecated. Please use function cmp().getScripts');
-        var options = this.options({
-            prefix: '',
-            pathField: 'path',
-            scriptField: 'main',
-            minify: false,
-            version: false
-        });
-        var id = this.args[0];
-        if (!id) {
-            grunt.fail.fatal('\n this.args[0] mast be component Id');
-        }
-
-        var cmp = cmpUtil.getCmp(id);
-        var logField = cmp.log(options.scriptField);
-        var dependencies = [];
-
-        var sources = [];
-
-        function parseScript(path, script, verParam) {
-
-            var minJsExt = '.min.js';
-            var jsExt = '.js';
-            var pointIndex = script.indexOf('./');
-            script = (pointIndex === 0 ? script.substr(2) : script );
-
-            if (options.minify) {
-
-                if (!lib.equalExt(script, minJsExt) && lib.equalExt(script, jsExt)) {
-                    script = script.replace(new RegExp('\.js$', 'i'), minJsExt);
-                } else if (!lib.equalExt(script, minJsExt)) {
-                    grunt.fail.fatal('\n error ' + logField + ' item = ' + script.red + ', must end with ' + jsExt);
-                }
-
-            } else {
-                if (lib.equalExt(script, minJsExt)) {
-                    script = script.replace(new RegExp('\.min\.js$', 'i'), jsExt);
-                } else if (!lib.equalExt(script, jsExt)) {
-                    grunt.fail.fatal('\n  error ' + logField + ' item = ' + script.red + ', must end in ' + jsExt);
-                }
-            }
-            script = options.prefix + path + '/' + script + verParam;
-
-            return script;
-
-        }
-
-        function addCmpScripts(cmpObject) {
-
-            if (!cmpObject[options.pathField]) {
-                grunt.fail.fatal('\n ' + cmpObject.log(options.pathField) + ' is empty.\n Please set field' + options.configField + ' in cmpSet task');
-            }
-
-
-            var path = cmpObject[options.pathField];
-            var verParam = options.version ? '?ver=' + cmpObject.version : '';
-
-            if (cmpObject[options.scriptField]) {
-                var scripts = cmpObject[options.scriptField];
-                if (scripts instanceof Array) {
-                    scripts.forEach(function (script) {
-                        sources.push(parseScript(path, script, verParam));
-                    });
-                } else {
-                    if (cmpObject.name === 'jquery') {
-                        sources.unshift(parseScript(path, scripts, verParam));
-                    } else {
-                        sources.push(parseScript(path, scripts, verParam));
-                    }
-
-                }
-            } else {
-                grunt.log.warn(cmpObject.log(options.scriptField) + ' is empty');
-            }
-        }
-
-        function iterateCmpDependencies(cmpObject) {
-            if (cmpObject.dependencies && cmpObject.dependencies.length > 0) {
-                grunt.verbose.writeln('>>'.cyan + cmpObject.log('dependencies[]', cmpObject.dependencies));
-            }
-
-            cmpObject.dependencies.forEach(function (depId) {
-
-                var depObject = cmpUtil.getCmp(depId);
-                var key = depObject.type + '_' + depObject.name;
-                if (!dependencies[key]) {
-                    //In the script can be only one version of the library
-                    dependencies[key] = depObject.version;
-
-                    iterateCmpDependencies(depObject);
-                    addCmpScripts(depObject);
-                } else if (dependencies[key] !== depObject.version) {
-                    grunt.log.warn('conflict ' + key + ' versions:',
-                        dependencies[key], '<> ' + depObject.version);
-                }
-            });
-        }
-
-
-        iterateCmpDependencies(cmp);
-        addCmpScripts(cmp);
-
-        cmp[options.scriptField] = sources;
-        grunt.log.ok(cmp.log(options.scriptField, sources));
-
-//        grunt.verbose.writeln('>> '.cyan + cmp.log(options.scriptField ,sources));
-
-    });
-
-
-    function finished(code){
-        return this(code === 0);
-    }
-
-
-
-
-
-    grunt.registerMultiTask('cmpKarma', 'run karma.', function() {
-        var done = this.async();
-        var options = this.options({
-            background: false,
-            client: {}
-        });
-
-        // Allow for passing cli arguments to `client.args` using  `--grep=x`
-        var args = _.filter(process.argv.slice(2), function(arg) {
-            return arg.match(/^--?/);
-        });
-        //grunt.log.writeln('  args:',args);
-
-        if (_.isArray(options.client.args)) {
-            options.client.args = options.client.args.concat(args);
-        } else {
-            options.client.args = args;
-        }
-
-        // Merge karma default options
-        _.defaults(options.client, {
-            args: [],
-            useIframe: true,
-            captureConsole: true
-        });
-
-        var opts = _.cloneDeep(options);
-        // Merge options onto data, with data taking precedence.
-        var data = _.merge(opts, this.data);
-
-        // But override the browsers array.
-        if (data.browsers && this.data.browsers) {
-            data.browsers = this.data.browsers;
-        }
-
-        // Merge client.args
-        if (this.data.client && _.isArray(this.data.client.args)) {
-            data.client.args = this.data.client.args.concat(options.client.args);
-        }
-
-
-        if (data.configFile) {
-            data.configFile = path.resolve(data.configFile);
-        }
-
-
-        var files = [];
-
-        if (data.files) {
-            data.files.map(function(file){
-                if(lib.isString(file)){
-                    files = files.concat(file.split(',').map(function(src){
-                        return {
-                            pattern: src
-                        };
-                    }));
-
-                }else if(file.pattern){
-                    files = files.concat(file.pattern.split(',').map(function(src){
-                        var obj = {
-                            pattern: src
-                        };
-                        ['watched', 'served', 'included'].forEach(function(opt) {
-                            if (opt in file) {
-                                obj[opt] = file[opt];
-                            }
-                        });
-                        return obj;
-                    }));
-                }
-
-            });
-
-        }
-        data.files = files;
-        grunt.verbose.writeln('>> data:',data);
-
-        // Allow the use of templates in preprocessors
-        if (_.isPlainObject(data.preprocessors)) {
-            var preprocessors = {};
-            Object.keys(data.preprocessors).forEach(function(key) {
-                var value = data.preprocessors[key];
-                key = path.resolve(key);
-                key = grunt.template.process(key);
-                preprocessors[key] = value;
-            });
-            data.preprocessors = preprocessors;
-        }
-
-        //support `karma run`, useful for grunt watch
-        if (this.flags.run){
-            runner.run(data, finished.bind(done));
-            return;
-        }
-
-        //allow karma to be run in the background so it doesn't block grunt
-        if (data.background){
-            var backgroundArgs = {
-                cmd: 'node',
-                args: process.execArgv.concat([
-                    path.join(__dirname, '..', 'lib', 'background.js'),
-                    JSON.stringify(data)
-                ])
-            };
-            var backgroundProcess = grunt.util.spawn(backgroundArgs, function(error) {
-                if (error) {
-                    grunt.log.error(error);
-                }
-            });
-            process.on('exit', function() {
-                backgroundProcess.kill();
-            });
-
-            done();
-        } else {
-            server.start(data, finished.bind(done));
-        }
     });
 
 
