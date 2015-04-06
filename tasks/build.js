@@ -249,7 +249,8 @@ module.exports = function (grunt) {
                         addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                     });
 
-                    if (currentTarget === 'test' && cmp.type === 'app'){
+
+                    if (options[cmp.type] && options[cmp.type].devDependencies){
                         lib.iterate(bower.devDependencies, function (depName, depDetail) {
                             addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                         });
@@ -293,7 +294,7 @@ module.exports = function (grunt) {
                         addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                     });
 
-                    if (currentTarget === 'test' && cmp.type === 'app'){
+                    if (options[cmp.type] && options[cmp.type].devDependencies){
                         lib.iterate(bower.devDependencies, function (depName, depDetail) {
                             addDependencyOrTask(currentTask, tasks, cmp, cmp.dependenciesDir + '/' + depName)
                         });
@@ -381,7 +382,7 @@ module.exports = function (grunt) {
         var logField = cmp.log(options.configField);
         var cmpConfig;
         if (!cmp[options.configField]) {
-            grunt.fail.fatal('\n field ' + logField + ' is empty.\n Please set field' + options.configField + ' in cmpSet');
+            grunt.fail.fatal('\n field ' + logField + ' is empty.\n Please set field ' + options.configField + ' in cmpSet');
         } else if (typeof cmp[options.configField] === "object") {
             cmpConfig = cmp[options.configField];
         } else {
