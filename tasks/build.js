@@ -355,11 +355,12 @@ module.exports = function (grunt) {
 
         var options = this.options({
             baseConfig: null,
-            configField: 'config',
-            pathField: 'path',
-            write: {
-                jsVariable: '_appConfig'
-            }
+            configField: null,
+            pathField: null,
+            writeYaml: null, //yaml file path
+            writeJson: null, //json file path
+            writeJs: null, //javascript file path
+            writeJsVariable: '_appConfig' //javascript variable in file path
         });
         var id = this.args[0];
         if (!id) {
@@ -367,45 +368,35 @@ module.exports = function (grunt) {
         }
         var cmp = cmpUtil.getCmp(id);
 
-
-        //read base config object
-        var baseConfig;
-        if (!options.baseConfig) {
-            grunt.fail.fatal('\n please set  baseConfig options as file url or javascript object');
-        } else if (typeof options.baseConfig === "object") {
-            baseConfig = options.baseConfig;
-        } else {
-            baseConfig = lib.readConfigFile(options.baseConfig, 'baseConfig');
-        }
+        //read base (or portal) config object
+        var baseConfig = lib.readConfigFile(options.baseConfig, function loaded(message){
+                grunt.log.writeln('>> '.blue + 'baseConfig <= '+ message);
+            },function error(message){
+                grunt.fail.fatal('\n Error options "baseConfig" - '+message);
+            });
 
         //read config object
         var logField = cmp.log(options.configField);
-        var cmpConfig;
-        if (!cmp[options.configField]) {
-            grunt.fail.fatal('\n field ' + logField + ' is empty.\n Please set field ' + options.configField + ' in cmpSet');
-        } else if (typeof cmp[options.configField] === "object") {
-            cmpConfig = cmp[options.configField];
-        } else {
-            cmpConfig = lib.readConfigFile(cmp[options.configField], logField);
-        }
+        var cmpConfig = lib.readConfigFile(cmp[options.configField],function loaded(message){
+                grunt.log.writeln('>> '.blue + logField + ' <= ' + message);
+            },function error(message){
+                grunt.fail.fatal('\n Error field ' + logField + ' - ' + message);
+            });
 
+        //merge base config object and current component config object
         merge.appConfigs(baseConfig, cmpConfig, cmp.name);
         grunt.log.ok(cmp.log(options.configField, [logField, 'baseConfig'], '<= merge'));
 
-        cmp.dependencies.forEach(function (depId) {
+        function mergeWithDependency(depId,isRoot){
             var depObject = cmpUtil.getCmp(depId);
-            if (depObject.type === 'mod' || depObject.type === 'template') {
-//                console.log('depObject.src =' + depObject.src);
+            if(depObject.type === 'mod' || depObject.type === 'template') {
 
                 var logDepCmp = depObject.log(options.configField);
-                var depConfig;
-                if (!depObject[options.configField]) {
-                    grunt.fail.fatal('\n field ' + logDepCmp + ' is empty.\n Please set field' + options.configField + ' in cmpSet');
-                } else if (typeof depObject[options.configField] === "object") {
-                    depObject = depObject[options.configField];
-                } else {
-                    depConfig = lib.readConfigFile(depObject[options.configField], logDepCmp);
-                }
+                var depConfig = lib.readConfigFile(depObject[options.configField], function loaded(message) {
+                    grunt.log.writeln('>> '.blue + logDepCmp + ' <= ' + message);
+                }, function error(message) {
+                    grunt.fail.fatal('\n Error field ' + logDepCmp + ' - ' + message);
+                });
 
                 if (depObject.type === 'mod') {
                     merge.modConfigs(baseConfig, cmpConfig, depConfig, depObject.name, depObject.version);
@@ -413,41 +404,58 @@ module.exports = function (grunt) {
 
                     cmpConfig[depObject.type][depObject.name].path = depObject[options.pathField];
                     grunt.log.ok(cmp.log(options.configField + '.' + depObject.type + '.' + depObject.name + '.path', depObject[options.pathField]));
+                    //iterate inner dependencies
+                    depObject.dependencies.forEach(function (depId) {
+                        mergeWithDependency(depId);
+                    });
 
-                } else {
+                } else if (isRoot) {//type === 'template'
                     merge.templateConfigs(baseConfig, cmpConfig, depConfig);
                     grunt.log.ok(cmp.log(options.configField, [logField, logDepCmp], '<= merge'));
 
-                    cmpConfig[depObject.type].baseUrl = depObject[options.pathField];//@depricated
                     cmpConfig[depObject.type].path = depObject[options.pathField];
                     grunt.log.ok(cmp.log(options.configField + '.' + depObject.type + '.path', depObject[options.pathField]));
+
+                    //iterate inner dependencies
+                    depObject.dependencies.forEach(function (depId) {
+                        mergeWithDependency(depId);
+                    });
                 }
-
-
             }
+
+        }
+
+        cmp.dependencies.forEach(function(depId){
+            mergeWithDependency(depId,true);
         });
 
         if (cmpConfig[cmp.type]) {
-            cmpConfig[cmp.type].baseUrl = cmp[options.pathField];//@depricated
+           // cmpConfig[cmp.type].baseUrl = cmp[options.pathField];//@depricated
             cmpConfig[cmp.type].path = cmp[options.pathField];
         }
         cmp[options.configField] = cmpConfig;
         grunt.verbose.writeln('>> ' + cmp.log(options.configField, cmpConfig));
 
-        if (options.write.jsFile) {
-            var jsFile = 'var ' + options.write.jsVariable + ' = ' + JSON.stringify(cmpConfig) + ';';
-            grunt.file.write(options.write.jsFile, jsFile);
-            grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.write.jsFile.cyan + ' as ' + ('"var ' + options.write.jsVariable + ' = {..};"').green);
+        if (options.writeJs) {
+            var jsFile = 'var ' + options.writeJsVariable + ' = ' + JSON.stringify(cmpConfig) + ';';
+            grunt.file.write(options.writeJs, jsFile);
+            grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.writeJs.cyan + ' as ' + ('"var ' + options.writeJsVariable + ' = {..};"').green);
 
         } else {
-            grunt.fail.fatal('\n options.write.jsFile not set ');
+            grunt.fail.fatal('\n options.writeJs not set ');
 
         }
 
-        if (options.write.yamlFile) {
+        if (options.writeJson) {
+            var jsonFile = JSON.stringify(cmpConfig, null, 2);
+            grunt.file.write(options.writeJson, jsonFile);
+            grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.writeJson.cyan);
+        }
+
+        if (options.writeYaml) {
             var yamlFile = yaml.dump(cmpConfig);
-            grunt.file.write(options.write.yamlFile, yamlFile);
-            grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.write.yamlFile.cyan);
+            grunt.file.write(options.writeYaml, yamlFile);
+            grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.writeYaml.cyan);
         }
 
         grunt.log.writeln('>>'.cyan + ' config file count', lib.fieldsCount(lib._configFiles).green);

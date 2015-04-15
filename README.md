@@ -130,20 +130,19 @@ cmpBuild task options:
 
     var taskConfig = {
         ..
-       cmpBuild: {
+        cmpBuild: {
             options: {
                 app: {
                     tasks: [
                         'cmpSet:app','jshint:cmp','jsonlint:app',
-                        'clean:cmp', 'copy:cmp', 'concat:cmp',
-                        'html2js:cmp', 'cmpConfig:app',
-                        'assemble:app'
+                        'clean:cmp', 'copy:cmp', 'concat:cmp', 'html2js:cmp',
+                        'cmpConfig:app', 'assemble:app'
                     ]
                 },
                 mod: {
                     tasks: [
-                        'cmpSet:mod', 'jshint:cmp', 'clean:cmp',
-                        'copy:cmp', 'concat:cmp', 'html2js:cmp'
+                        'cmpSet:mod', 'jshint:cmp',
+                        'clean:cmp', 'copy:cmp', 'concat:cmp', 'html2js:cmp'
                     ]
                 },
                 lib: {
@@ -153,7 +152,7 @@ cmpBuild task options:
                 },
                 template: {
                     tasks: [
-                        'cmpSet:template', 'clean:cmp', 'copy:cmp'
+                        'cmpSet:template', 'clean:cmp', 'copy:cmp','html2js:template'
                     ]
                 },
                 portal: {
@@ -170,25 +169,33 @@ cmpBuild task options:
                         devDependencies: true,
                         tasks: [
                             'cmpSet:app', 'jshint:cmp', 'jsonlint:app',
-                            'clean:cmp', 'copy:cmp', 'concat:cmp',
-                            'html2js:cmp', 'cmpConfig:app', 'cmpKarma:unit'
+                            'clean:cmp', 'copy:cmp', 'concat:cmp', 'html2js:cmp',
+                            'cmpConfig:app', 'cmpKarma:unit'
                         ]
                     }
                 }
             },
             prod: {
                 options: {
-                    app: [
+                    app: {
+                        tasks: [
                             'cmpSet:app', 'jshint:cmp', 'jsonlint:app',
-                            'clean:cmp', 'copy:cmp', 'concat:cmp',
-                            'ngAnnotate:cmp', 'html2js:cmp','cmpConfig:app', 'uglify:cmp',
-                            'assemble:appMin'
-                    ],
-                    mod: [
+                            'clean:cmp', 'copy:cmp', 'concat:cmp', 'html2js:cmp',
+                            'cmpConfig:appMin', 'ngAnnotate:cmp', 'uglify:cmp', 'assemble:appMin'
+                        ]
+                    },
+                    mod: {
+                        tasks: [
                             'cmpSet:mod', 'jshint:cmp',
-                            'clean:cmp', 'copy:cmp', 'concat:cmp',
-                            'ngAnnotate:cmp', 'html2js:cmp', 'uglify:cmp'
-                    ]
+                            'clean:cmp', 'copy:cmp', 'concat:cmp', 'html2js:cmp',
+                            'ngAnnotate:cmp', 'uglify:cmp'
+                        ]
+                    },
+                    template: {
+                        tasks: [
+                            'cmpSet:template', 'clean:cmp', 'copy:cmp', 'html2js:template', 'uglify:cmp'
+                        ]
+                    }
                 }
             }
         },
@@ -225,12 +232,7 @@ dynamically set additional fields to cmp() object
                     config: '<%=cmp().dir %>/src/config.yml',
                     script: 'scripts/app.js',
                     unit: 'tests/app-unit.spec.js',
-                    e2e: 'tests/app-e2e.spec.js',
-                    main: [
-                        'scripts/app-config.js',
-                        'scripts/app.js',
-                        'scripts/app-views.js'
-                    ]
+                    e2e: 'tests/app-e2e.spec.js'
                 }
             },
             mod: {
@@ -238,11 +240,7 @@ dynamically set additional fields to cmp() object
                     config: '<%=cmp().dir %>/src/config.yml',
                     script: 'scripts/mod.js',
                     unit: 'tests/mod-unit.spec.js',
-                    e2e: 'tests/mod-e2e.spec.js',
-                    main: [
-                        'scripts/mod.js',
-                        'scripts/mod-views.js'
-                    ]
+                    e2e: 'tests/mod-e2e.spec.js'
                 }
             },
             lib:{
@@ -268,19 +266,20 @@ and as YAML in yamlFile
     var taskConfig = {
         ..
         cmpConfig: {
+            options: {
+                baseConfig: './config.yml',
+                configField: 'config',
+                pathField: 'path',
+                writeJsVariable: '_<%=cmp().name %>AppConfig',
+                writeJs: '<%=cmp().dest %>/scripts/app-config.js'
+            },
             app: {
                 options: {
-                    baseConfig: './config.yml',
-                    configField: 'config',
-                    pathField: 'path',
-
-                    write: {
-                        jsVariable: '_<%=cmp().name %>AppConfig',
-                        jsFile: '<%=cmp().dest %>/scripts/app-config.js',
-                        yamlFile: '<%=cmp().dest %>/config.yml'
-                    }
-
+                    writeYaml: '<%=cmp().dest %>/scripts/app-config.yml',
+                    writeJson: '<%=cmp().dest %>/scripts/app-config.json'
                 }
+            },
+            appMin: {
             }
         },
         ...
@@ -339,16 +338,19 @@ and for example use cmp fields in assemble.io
                 layout: 'default.hbs',
                 partials: '<%=cmp(cmp().template).src %>/_includes/*.hbs',
                 flatten: true,
-                hbs:{
+                var:{
                     assets: '/<%=cmp(cmp().template).path %>',
                     name: '<%=cmp().name %>App',
+                    home: '/',
+                    path: '/<%=cmp().name %>.html',
                     title: '<%=cmp().config.app.title %>',
-                    scripts: function(){
-                        return cmpUtil.getCmp().getScripts('/','path','main');
-                    },
-                    links: function(){
-                        return cmpUtil.getCmp().getLinks('/','path','main');
-                    }
+                    counter: false
+                },
+                javascripts: function(){
+                    return cmpUtil.getCmp().getScripts('/','path','main');
+                },
+                links: function(){
+                    return cmpUtil.getCmp().getLinks('/','path','main');
                 }
             },
             app: {
@@ -357,11 +359,10 @@ and for example use cmp fields in assemble.io
             },
             appMin: {
                 options: {
-                    hbs: {
-                        scripts: function () {
-                            return cmpUtil.getCmp().getScripts('/', 'path', 'main', true);
-                        }
-                    }
+                    javascripts: function () {
+                        return cmpUtil.getCmp().getScripts('/', 'path', 'main', true);
+                    },
+                    counter: '<%=params.counter %>'
                 },
                 src: ['<%=cmp().src %>/<%=cmp().name %>.hbs'],
                 dest: '<%=params.build %>'
@@ -370,8 +371,13 @@ and for example use cmp fields in assemble.io
 
 head.hbs (include for assemble)
 
-        {{# hbs.links }}<link type="{{ type }}" href="{{ src }}" rel="{{ rel }}" media="{{ media }}"/>
-        {{/ hbs.links }}
+        {{# links }}<link type="{{ type }}" href="{{ src }}" rel="{{ rel }}" media="{{ media }}"/>
+        {{/ links }}
+
+scripts.hbs (include for assemble)
+
+        {{# javascripts }}<script type="{{ type }}" src="{{ src }}"></script>
+        {{/ javascripts }}
 
 if template cmp() field values
 
@@ -390,3 +396,25 @@ then result code in html
     <link type="text/css" href="/template/inner/0.1.0/css/magic-bootstrap.css?ver=0.1.0" rel="stylesheet" media="screen"/>
     <link type="text/css" href="/template/inner/0.1.0/css/style.css?ver=0.1.0" rel="stylesheet" media="screen"/>
     <link type="text/css" href="/template/inner/0.1.0/css/print.css?ver=0.1.0" rel="stylesheet" media="print"/>
+
+    ...
+
+    <script type="text/javascript" src="/lib/jquery/2.0.3/jquery.js?ver=2.0.3"></script>
+    <script type="text/javascript" src="/lib/angular/1.2.28/angular.js?ver=1.2.28"></script>
+    <script type="text/javascript" src="/lib/angular-bootstrap/0.8.0/ui-bootstrap-tpls.js?ver=0.8.0"></script>
+    <script type="text/javascript" src="/lib/angular-resource/1.2.28/angular-resource.js?ver=1.2.28"></script>
+    <script type="text/javascript" src="/lib/angular-cookies/1.2.28/angular-cookies.js?ver=1.2.28"></script>
+    <script type="text/javascript" src="/lib/angular-sanitize/1.2.28/angular-sanitize.js?ver=1.2.28"></script>
+    <script type="text/javascript" src="/lib/angular-ui-router/0.2.13/release/angular-ui-router.js?ver=0.2.13"></script>
+    <script type="text/javascript" src="/mod/core/0.1.8/scripts/mod.js?ver=0.1.8"></script>
+    <script type="text/javascript" src="/mod/message/0.1.6/scripts/mod.js?ver=0.1.6"></script>
+    <script type="text/javascript" src="/mod/message/0.1.6/scripts/mod-views.js?ver=0.1.6"></script>
+    <script type="text/javascript" src="/mod/tooltip/0.1.3/scripts/mod.js?ver=0.1.3"></script>
+    <script type="text/javascript" src="/mod/footer/0.2.1/scripts/mod.js?ver=0.2.1"></script>
+    <script type="text/javascript" src="/mod/footer/0.2.1/scripts/mod-views.js?ver=0.2.1"></script>
+    <script type="text/javascript" src="/app/usecases/EPU1m/scripts/app-config.js?ver=EPU1m"></script>
+    <script type="text/javascript" src="/app/usecases/EPU1m/scripts/app.js?ver=EPU1m"></script>
+    <script type="text/javascript" src="/app/usecases/EPU1m/scripts/app-views.js?ver=EPU1m"></script>
+    <script type="text/javascript" src="/app/online/AYGT6/scripts/app-config.js?ver=AYGT6"></script>
+    <script type="text/javascript" src="/app/online/AYGT6/scripts/app.js?ver=AYGT6"></script>
+    <script type="text/javascript" src="/app/online/AYGT6/scripts/app-views.js?ver=AYGT6"></script>
