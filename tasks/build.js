@@ -5,10 +5,12 @@ var cli = require('bower/lib/util/cli');
 var dirsum = require('dirsum');
 var sh = require('shorthash');
 
-require('events').EventEmitter.prototype._maxListeners = 100;
-
 module.exports = function (grunt) {
     console.log('Grunt cmp builder lib is loaded!');
+
+    if (process.setMaxListeners) {
+        process.setMaxListeners(200);
+    }
 
     var lib = require('../lib/lib').init(grunt);
     var cmpUtil = require('../lib/cmp').init(grunt);
@@ -447,7 +449,7 @@ module.exports = function (grunt) {
         }
 
         if (options.writeJson) {
-            var jsonFile = JSON.stringify(cmpConfig, null, 2);
+            var jsonFile = JSON.stringify(cmpConfig,null, 2);
             grunt.file.write(options.writeJson, jsonFile);
             grunt.log.writeln('>> '.blue + logField + ' => saved to ' + options.writeJson.cyan);
         }
