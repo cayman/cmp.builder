@@ -4,13 +4,10 @@ var bower = require('bower');
 var cli = require('bower/lib/util/cli');
 var dirsum = require('dirsum');
 var sh = require('shorthash');
+require('events').EventEmitter.prototype._maxListeners = 200;
 
 module.exports = function (grunt) {
     console.log('Grunt cmp builder lib is loaded!');
-
-    if (process.setMaxListeners) {
-        process.setMaxListeners(200);
-    }
 
     var lib = require('../lib/lib').init(grunt);
     var cmpUtil = require('../lib/cmp').init(grunt);
