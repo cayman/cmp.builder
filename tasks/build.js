@@ -233,10 +233,6 @@ module.exports = function (grunt) {
 
             if (id) {
 
-                if (!bower.version) {
-                    grunt.fail.fatal('Files ' + cmpDir + '/' + options.bowerFile + ' mast have version or hashDir field');
-                }
-
                 cmp = cmpUtil.getComponents()[id];
 
                 if (!cmp) {
