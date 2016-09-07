@@ -1,7 +1,7 @@
 {
     "name": "grunt-cmp-builder",
     "description": "Grunt compiler for cmp components",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "author": {
         "name": "Zakirov"
     },
@@ -26,7 +26,7 @@
     "devDependencies": {
     },
     "peerDependencies": {
-        "grunt": "0.4.x"
+        "grunt": ">=0.4.0"
     },
     "keywords": [
         "gruntplugin","generator-cmp"
