@@ -6,10 +6,10 @@
         "name": "Zakirov"
     },
     "main": "tasks/build.js",
-    "homepage" : "https://github.com/cayman/cmp.builder",
-    "repository" : {
-        "type" : "git",
-        "url" : "https://github.com/cayman/cmp.builder.git"
+    "homepage": "https://github.com/cayman/cmp.builder",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/cayman/cmp.builder.git"
     },
     "engines": {
         "node": ">= 0.8.0"
@@ -23,13 +23,13 @@
         "shorthash": "~0.0.2",
         "bower": "~1.4.1"
     },
-    "devDependencies": {
-    },
+    "devDependencies": {},
     "peerDependencies": {
         "grunt": ">=0.4.0"
     },
     "keywords": [
-        "gruntplugin","generator-cmp"
+        "gruntplugin",
+        "generator-cmp"
     ],
     "license": " MIT",
     "readmeFilename": "README.md"
